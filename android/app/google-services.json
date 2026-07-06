@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "333653930292",
+    "project_id": "hoyaid-app-b2f66",
+    "storage_bucket": "hoyaid-app-b2f66.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:333653930292:android:714dc2390d07aa036bb561",
+        "android_client_info": {
+          "package_name": "com.tazidi.hoyaid"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "333653930292-dam4qqfhhhu7n47s787lk8fo0l6fapn5.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.tazidi.hoyaid",
+            "certificate_hash": "e93683fd9edb41705474708530754e90cfcc1a64"
+          }
+        },
+        {
+          "client_id": "333653930292-vhlkdna7146eqio3ls4ej5nd5ahmlg5i.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDLoYnN1rGTqh8HEykcyQe0H7s-Dmht3IU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "333653930292-vhlkdna7146eqio3ls4ej5nd5ahmlg5i.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "333653930292-jdec078va4g8n6aepkjes90dnrm819g4.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.taV1"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "228000809987",
+    "project_id": "hoyaid-app",
+    "storage_bucket": "hoyaid-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:228000809987:android:9ffdcd3741b59c02147a36",
+        "android_client_info": {
+          "package_name": "com.tazidi.hoyaid"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBjPf1OvVb9IEMvNLATClLZ8DP4ibJeOSg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

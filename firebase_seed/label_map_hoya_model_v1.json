@@ -1,0 +1,133 @@
+{
+  "collection": "label_map",
+  "documentId": "hoya_model_v1",
+  "modelVersion": "hoya_model_v1",
+  "modelAssetPath": "assets/models/hoya_model_v1.tflite",
+  "labelsAssetPath": "assets/models/labels.txt",
+  "sourceExperimentPath": "All_Species/Draft Train/Training_Experiment/V8/outputs/D4_6",
+  "sourceClassesFile": "D4_6/classes.json",
+  "labelCount": 30,
+  "isActive": true,
+  "labels": [
+    {
+      "labelIndex": 0,
+      "speciesId": "hoya_amicabilis"
+    },
+    {
+      "labelIndex": 1,
+      "speciesId": "hoya_australis"
+    },
+    {
+      "labelIndex": 2,
+      "speciesId": "hoya_callistophylla"
+    },
+    {
+      "labelIndex": 3,
+      "speciesId": "hoya_excavata"
+    },
+    {
+      "labelIndex": 4,
+      "speciesId": "hoya_finlaysonii"
+    },
+    {
+      "labelIndex": 5,
+      "speciesId": "hoya_garut_1"
+    },
+    {
+      "labelIndex": 6,
+      "speciesId": "hoya_gunung_lawu_lumajang"
+    },
+    {
+      "labelIndex": 7,
+      "speciesId": "hoya_hypolasia"
+    },
+    {
+      "labelIndex": 8,
+      "speciesId": "hoya_incurvula"
+    },
+    {
+      "labelIndex": 9,
+      "speciesId": "hoya_latifolia"
+    },
+    {
+      "labelIndex": 10,
+      "speciesId": "hoya_mamasa"
+    },
+    {
+      "labelIndex": 11,
+      "speciesId": "hoya_minahassae"
+    },
+    {
+      "labelIndex": 12,
+      "speciesId": "hoya_monetteae"
+    },
+    {
+      "labelIndex": 13,
+      "speciesId": "hoya_multiflora"
+    },
+    {
+      "labelIndex": 14,
+      "speciesId": "hoya_polypus_kalteng"
+    },
+    {
+      "labelIndex": 15,
+      "speciesId": "hoya_rigidifolia"
+    },
+    {
+      "labelIndex": 16,
+      "speciesId": "hoya_surisana"
+    },
+    {
+      "labelIndex": 17,
+      "speciesId": "hoya_towutiensis"
+    },
+    {
+      "labelIndex": 18,
+      "speciesId": "hoya_vitellina"
+    },
+    {
+      "labelIndex": 19,
+      "speciesId": "hoya_vittelinoides"
+    },
+    {
+      "labelIndex": 20,
+      "speciesId": "hoya_walicii_ssp_tenebrosa"
+    },
+    {
+      "labelIndex": 21,
+      "speciesId": "hoya_campanulata_white"
+    },
+    {
+      "labelIndex": 22,
+      "speciesId": "hoya_caudata"
+    },
+    {
+      "labelIndex": 23,
+      "speciesId": "hoya_cinnamomifolia"
+    },
+    {
+      "labelIndex": 24,
+      "speciesId": "hoya_diversifolia"
+    },
+    {
+      "labelIndex": 25,
+      "speciesId": "hoya_glabra"
+    },
+    {
+      "labelIndex": 26,
+      "speciesId": "hoya_occultata_silver"
+    },
+    {
+      "labelIndex": 27,
+      "speciesId": "hoya_scortechinii"
+    },
+    {
+      "labelIndex": 28,
+      "speciesId": "hoya_tomatoensis"
+    },
+    {
+      "labelIndex": 29,
+      "speciesId": "hoya_waymaniae"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "name": "functions",
+  "description": "Cloud Functions for HoyaID",
+  "engines": {
+    "node": "20"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "firebase-admin": "^13.10.0",
+    "firebase-functions": "^7.2.5"
+  },
+  "private": true
+}

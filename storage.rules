@@ -1,0 +1,89 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
+        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function speciesExists(speciesId) {
+      return firestore.exists(/databases/(default)/documents/species/$(speciesId));
+    }
+
+    function speciesData(speciesId) {
+      return firestore.get(/databases/(default)/documents/species/$(speciesId)).data;
+    }
+
+    function canReadSpeciesImage(speciesId) {
+      return speciesExists(speciesId)
+        && (speciesData(speciesId).isActive == true || isAdmin());
+    }
+
+    function classificationExists(classificationId) {
+      return firestore.exists(/databases/(default)/documents/classifications/$(classificationId));
+    }
+
+    function classificationData(classificationId) {
+      return firestore.get(/databases/(default)/documents/classifications/$(classificationId)).data;
+    }
+
+    function ownsClassificationImage(userId, classificationId) {
+      return signedIn()
+        && request.auth.uid == userId
+        && classificationExists(classificationId)
+        && classificationData(classificationId).userId == request.auth.uid;
+    }
+
+    function canReadClassificationImage(userId, classificationId) {
+      return classificationExists(classificationId)
+        && (
+          classificationData(classificationId).status == 'active'
+          || ownsClassificationImage(userId, classificationId)
+          || isAdmin()
+        );
+    }
+
+    match /species_images/{speciesId}/{fileName} {
+      allow read: if canReadSpeciesImage(speciesId);
+      allow create, update: if isAdmin()
+        && request.resource.size <= 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if isAdmin();
+    }
+
+    match /classification_images/{userId}/{classificationId}/{fileName} {
+      allow read: if canReadClassificationImage(userId, classificationId);
+      allow create, update: if signedIn()
+        && request.auth.uid == userId
+        && fileName == 'display_640.jpg'
+        && request.resource.size <= 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*')
+        && ownsClassificationImage(userId, classificationId)
+        && classificationData(classificationId).status == 'pending';
+      allow delete: if isAdmin();
+    }
+
+    match /dataset_exports/{fileName} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /models/{modelVersion}/{fileName} {
+      allow read: if signedIn();
+      allow create, update: if isAdmin()
+        && fileName.matches('.*\\.tflite')
+        && request.resource.size <= 100 * 1024 * 1024;
+      allow delete: if isAdmin();
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
