@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hoyaid/core/utils/error_messages.dart';
 import 'package:hoyaid/features/auth/providers/auth_provider.dart';
 import 'package:hoyaid/features/classification/providers/classification_provider.dart';
+import 'package:hoyaid/features/classification/services/plant_filter_service.dart';
 import 'package:image_picker/image_picker.dart';
 
 class ClassificationScreen extends ConsumerStatefulWidget {
@@ -17,6 +18,7 @@ class ClassificationScreen extends ConsumerStatefulWidget {
 class _ClassificationScreenState extends ConsumerState<ClassificationScreen> {
   bool _isClassifying = false;
   String? _errorMessage;
+  bool _isNotPlant = false; // true bila ML Kit mendeteksi bukan tanaman
 
   Future<void> _openCameraAndClassify() async {
     final image = await context.push<XFile>('/classification/camera');
@@ -28,6 +30,7 @@ class _ClassificationScreenState extends ConsumerState<ClassificationScreen> {
     setState(() {
       _isClassifying = true;
       _errorMessage = null;
+      _isNotPlant = false;
     });
 
     try {
@@ -36,6 +39,10 @@ class _ClassificationScreenState extends ConsumerState<ClassificationScreen> {
           .classifyImage(imagePath);
       if (!mounted) return;
       await context.push('/classification/result', extra: draft);
+    } on NotAPlantException {
+      // ML Kit mendeteksi bukan tanaman — tampilkan panel khusus
+      if (!mounted) return;
+      setState(() => _isNotPlant = true);
     } catch (error) {
       if (!mounted) return;
       setState(
@@ -94,7 +101,13 @@ class _ClassificationScreenState extends ConsumerState<ClassificationScreen> {
                   isClassifying: _isClassifying,
                   onOpenCamera: _openCameraAndClassify,
                 ),
-                if (_errorMessage != null) ...[
+                // Panel: bukan tanaman (ML Kit filter)
+                if (_isNotPlant) ...[
+                  const SizedBox(height: 16),
+                  _NotAPlantPanel(
+                    onRetry: _openCameraAndClassify,
+                  ),
+                ] else if (_errorMessage != null) ...[
                   const SizedBox(height: 16),
                   _ErrorPanel(message: _errorMessage!),
                 ],
@@ -470,6 +483,141 @@ class _StatusRow extends StatelessWidget {
       trailing: Icon(
           done ? Icons.check_circle_rounded : Icons.hourglass_top_rounded,
           color: done ? Colors.green : Colors.orange),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Panel: Foto bukan tanaman (ML Kit filter stage 1)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _NotAPlantPanel extends StatelessWidget {
+  final VoidCallback onRetry;
+
+  const _NotAPlantPanel({required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF7B1A1A), Color(0xFFBF360C)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.18),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.block_rounded,
+                  color: Colors.white,
+                  size: 32,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Bukan Tanaman Hoya',
+                      style:
+                          Theme.of(context).textTheme.titleMedium?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w900,
+                              ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Foto yang Anda kirim tidak terdeteksi sebagai tanaman.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.88),
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.20),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _SuggestionRow(
+                  icon: Icons.eco_rounded,
+                  text: 'Pastikan foto menampilkan daun, bunga, atau bagian tanaman Hoya',
+                ),
+                SizedBox(height: 8),
+                _SuggestionRow(
+                  icon: Icons.wb_sunny_rounded,
+                  text: 'Gunakan pencahayaan yang cukup dan fokus pada tanaman',
+                ),
+                SizedBox(height: 8),
+                _SuggestionRow(
+                  icon: Icons.crop_free_rounded,
+                  text: 'Hindari foto benda lain: botol, orang, atau latar belakang kosong',
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.white,
+                side: const BorderSide(color: Colors.white54),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              onPressed: onRetry,
+              icon: const Icon(Icons.camera_alt_rounded),
+              label: const Text('Coba Foto Ulang'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SuggestionRow extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _SuggestionRow({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: Colors.white70, size: 16),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.88),
+                ),
+          ),
+        ),
+      ],
     );
   }
 }

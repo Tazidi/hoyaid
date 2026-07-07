@@ -7,6 +7,7 @@ import 'package:hoyaid/features/classification/services/image_preprocess_service
 import 'package:hoyaid/features/classification/services/label_map_service.dart';
 import 'package:hoyaid/features/classification/services/location_service.dart';
 import 'package:hoyaid/features/classification/services/ood_service.dart';
+import 'package:hoyaid/features/classification/services/plant_filter_service.dart';
 import 'package:hoyaid/features/classification/services/tflite_service.dart';
 
 final classificationConfigServiceProvider =
@@ -34,6 +35,12 @@ final tfliteServiceProvider = Provider<TFLiteService>((ref) {
 
 final locationServiceProvider = Provider<LocationService>((ref) {
   return LocationService();
+});
+
+final plantFilterServiceProvider = Provider<PlantFilterService>((ref) {
+  final service = PlantFilterService();
+  ref.onDispose(service.dispose);
+  return service;
 });
 
 final cameraPermissionServiceProvider =

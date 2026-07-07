@@ -312,6 +312,10 @@ class _ClassificationResultScreenState
     final uploadLimit = (userData?['uploadLimit'] as num?)?.toInt() ?? 5;
     final quotaFull = uploadUsed >= uploadLimit;
 
+    // Tentukan level OOD untuk mengontrol tampilan
+    final oodLevel = draft.prediction.ood.level;
+    final isRejected = oodLevel == OodLevel.rejected;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Hasil Klasifikasi')),
       body: SafeArea(
@@ -325,13 +329,28 @@ class _ClassificationResultScreenState
                 child: Image.memory(
                   draft.displayJpegBytes,
                   fit: BoxFit.cover,
+                  // Greyed-out jika rejected agar user tahu ini hasil sangat meragukan
+                  color: isRejected
+                      ? Colors.grey.withValues(alpha: 0.55)
+                      : null,
+                  colorBlendMode: isRejected ? BlendMode.saturation : null,
                 ),
               ),
             ),
             const SizedBox(height: 16),
+
+            // Banner rejected — tampil sebelum header prediksi
+            if (isRejected) ...[
+              _RejectedBanner(prediction: draft.prediction),
+              const SizedBox(height: 12),
+            ],
+
             _PredictionHeader(draft: draft),
-            if (draft.prediction.ood.isLowConfidence ||
-                draft.prediction.ood.isLikelyOod) ...[
+
+            // Warning uncertain (hanya bila bukan rejected)
+            if (!isRejected &&
+                (draft.prediction.ood.isLowConfidence ||
+                    draft.prediction.ood.isLikelyOod)) ...[
               const SizedBox(height: 12),
               _WarningPanel(prediction: draft.prediction),
             ],
@@ -352,22 +371,26 @@ class _ClassificationResultScreenState
             const SizedBox(height: 16),
             _TopPredictionsPanel(predictions: draft.prediction.topPredictions),
             const SizedBox(height: 16),
-            _LocationPanel(
-              location: _location,
-              latitudeController: _latitudeController,
-              longitudeController: _longitudeController,
-              isGettingGps: _isGettingGps,
-              onUseGps: _useGpsLocation,
-              onPickManual: _pickManualLocation,
-              onApplyCoordinates: () {
-                if (_applyTypedCoordinates()) setState(() {});
-              },
-              onClear: () => _setLocation(null),
-            ),
-            const SizedBox(height: 16),
+            // Panel lokasi hanya tampil jika bukan rejected
+            if (!isRejected) ...[
+              _LocationPanel(
+                location: _location,
+                latitudeController: _latitudeController,
+                longitudeController: _longitudeController,
+                isGettingGps: _isGettingGps,
+                onUseGps: _useGpsLocation,
+                onPickManual: _pickManualLocation,
+                onApplyCoordinates: () {
+                  if (_applyTypedCoordinates()) setState(() {});
+                },
+                onClear: () => _setLocation(null),
+              ),
+              const SizedBox(height: 16),
+            ],
             _SavePanel(
               isSaving: _isSaving,
               quotaFull: quotaFull,
+              isRejected: isRejected,
               uploadUsed: uploadUsed,
               uploadLimit: uploadLimit,
               failureMessage: _saveFailureMessage,
@@ -693,6 +716,7 @@ class _LocationPanel extends StatelessWidget {
 class _SavePanel extends StatelessWidget {
   final bool isSaving;
   final bool quotaFull;
+  final bool isRejected;
   final int uploadUsed;
   final int uploadLimit;
   final String? failureMessage;
@@ -703,6 +727,7 @@ class _SavePanel extends StatelessWidget {
   const _SavePanel({
     required this.isSaving,
     required this.quotaFull,
+    this.isRejected = false,
     required this.uploadUsed,
     required this.uploadLimit,
     this.failureMessage,
@@ -713,11 +738,12 @@ class _SavePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final blocked = isSaving || quotaFull || isRejected;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         FilledButton.icon(
-          onPressed: isSaving || quotaFull ? null : onSave,
+          onPressed: blocked ? null : onSave,
           icon: isSaving
               ? const SizedBox.square(
                   dimension: 18,
@@ -728,13 +754,17 @@ class _SavePanel extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          failureMessage != null
-              ? 'Status: belum tersimpan. Tekan simpan untuk mencoba lagi.'
-              : quotaFull
-                  ? 'Kuota penuh: $uploadUsed / $uploadLimit.'
-                  : 'Status: belum tersimpan. Klasifikasi tetap bisa dilihat di layar ini sebelum disimpan.',
+          isRejected
+              ? 'Tidak dapat disimpan: prediksi tidak cukup yakin untuk data ini.'
+              : failureMessage != null
+                  ? 'Status: belum tersimpan. Tekan simpan untuk mencoba lagi.'
+                  : quotaFull
+                      ? 'Kuota penuh: $uploadUsed / $uploadLimit.'
+                      : 'Status: belum tersimpan. Klasifikasi tetap bisa dilihat di layar ini sebelum disimpan.',
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodySmall,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: isRejected ? Theme.of(context).colorScheme.error : null,
+          ),
         ),
         if (failureMessage != null) ...[
           const SizedBox(height: 12),
@@ -806,6 +836,82 @@ class _SaveFailurePanel extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Banner: prediksi rejected (bukan spesies Hoya yang dikenal)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _RejectedBanner extends StatelessWidget {
+  final ClassificationPrediction prediction;
+
+  const _RejectedBanner({required this.prediction});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF6A0000), Color(0xFFB71C1C)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.sentiment_dissatisfied_rounded,
+              color: Colors.white,
+              size: 28,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Bukan Spesies Hoya yang Dikenal',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                      ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Model sangat tidak yakin dengan foto ini '
+                  '(confidence ${(prediction.confidence * 100).toStringAsFixed(1)}%, '
+                  'OOD score ${prediction.ood.score.toStringAsFixed(2)}). '
+                  'Kemungkinan foto bukan Hoya atau kualitas gambar terlalu rendah.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.90),
+                        height: 1.5,
+                      ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  '💡 Kembali dan ambil foto ulang dengan pencahayaan lebih baik, fokus pada bagian tanaman.',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.80),
+                        height: 1.4,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

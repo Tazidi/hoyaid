@@ -14,6 +14,14 @@ class ClassificationConfig {
   final int rareCoordPrecision;
   final int maxImageSizeMb;
 
+  /// Confidence di bawah nilai ini dianggap [OodLevel.rejected] (bukan Hoya).
+  /// Default: 0.30 (model hampir tidak yakin sama sekali).
+  final double rejectedConfidenceThreshold;
+
+  /// OOD score di atas nilai ini dianggap [OodLevel.rejected].
+  /// Default: 0.82
+  final double rejectedOodScoreThreshold;
+
   const ClassificationConfig({
     required this.activeModelVersion,
     required this.useRemoteModel,
@@ -29,6 +37,8 @@ class ClassificationConfig {
     required this.publicCoordPrecision,
     required this.rareCoordPrecision,
     required this.maxImageSizeMb,
+    this.rejectedConfidenceThreshold = 0.30,
+    this.rejectedOodScoreThreshold = 0.82,
   });
 
   factory ClassificationConfig.fallback() {
@@ -47,6 +57,8 @@ class ClassificationConfig {
       publicCoordPrecision: 2,
       rareCoordPrecision: 1,
       maxImageSizeMb: 5,
+      rejectedConfidenceThreshold: 0.30,
+      rejectedOodScoreThreshold: 0.82,
     );
   }
 
@@ -101,6 +113,14 @@ class ClassificationConfig {
         fallback.rareCoordPrecision,
       ),
       maxImageSizeMb: readInt('maxImageSizeMb', fallback.maxImageSizeMb),
+      rejectedConfidenceThreshold: readDouble(
+        'rejectedConfidenceThreshold',
+        fallback.rejectedConfidenceThreshold,
+      ),
+      rejectedOodScoreThreshold: readDouble(
+        'rejectedOodScoreThreshold',
+        fallback.rejectedOodScoreThreshold,
+      ),
     );
   }
 }

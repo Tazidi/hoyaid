@@ -7,6 +7,8 @@ class OodService {
     required List<double> probabilities,
     required double minConfidenceWarning,
     required double oodThreshold,
+    double rejectedConfidenceThreshold = 0.30,
+    double rejectedOodScoreThreshold = 0.82,
   }) {
     if (probabilities.isEmpty) {
       return const OodEvaluation(
@@ -15,6 +17,7 @@ class OodService {
         topMargin: 0,
         isLowConfidence: true,
         isLikelyOod: true,
+        level: OodLevel.rejected,
       );
     }
 
@@ -34,12 +37,28 @@ class OodService {
         .toDouble();
 
     final isLowConfidence = top1 < minConfidenceWarning;
+    final isLikelyOod = isLowConfidence || score >= oodThreshold;
+
+    // Tentukan OodLevel berdasarkan seberapa ekstrem kondisinya:
+    // rejected: confidence sangat rendah ATAU ood score sangat tinggi ATAU entropi hampir maksimal
+    final OodLevel level;
+    if (top1 < rejectedConfidenceThreshold ||
+        score >= rejectedOodScoreThreshold ||
+        entropy >= 0.92) {
+      level = OodLevel.rejected;
+    } else if (isLikelyOod) {
+      level = OodLevel.uncertain;
+    } else {
+      level = OodLevel.ok;
+    }
+
     return OodEvaluation(
       score: score,
       entropy: entropy,
       topMargin: topMargin,
       isLowConfidence: isLowConfidence,
-      isLikelyOod: isLowConfidence || score >= oodThreshold,
+      isLikelyOod: isLikelyOod,
+      level: level,
     );
   }
 

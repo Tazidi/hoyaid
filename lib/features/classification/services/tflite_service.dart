@@ -102,6 +102,8 @@ class TFLiteService {
       probabilities: probabilities,
       minConfidenceWarning: config.minConfidenceWarning,
       oodThreshold: config.oodThreshold,
+      rejectedConfidenceThreshold: config.rejectedConfidenceThreshold,
+      rejectedOodScoreThreshold: config.rejectedOodScoreThreshold,
     );
 
     return ClassificationPrediction(

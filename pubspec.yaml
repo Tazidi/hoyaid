@@ -43,6 +43,9 @@ dependencies:
   flutter_map: ^7.0.2
   latlong2: ^0.9.1
 
+  # ML Kit - plant/object filter (pre-classification gate)
+  google_mlkit_image_labeling: ^0.14.2
+
   # Icons
   cupertino_icons: ^1.0.8
 

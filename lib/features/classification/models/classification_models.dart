@@ -20,12 +20,19 @@ class TopPrediction {
   }
 }
 
+enum OodLevel {
+  ok,
+  uncertain,
+  rejected,
+}
+
 class OodEvaluation {
   final double score;
   final double entropy;
   final double topMargin;
   final bool isLowConfidence;
   final bool isLikelyOod;
+  final OodLevel level;
 
   const OodEvaluation({
     required this.score,
@@ -33,6 +40,7 @@ class OodEvaluation {
     required this.topMargin,
     required this.isLowConfidence,
     required this.isLikelyOod,
+    required this.level,
   });
 }
 
