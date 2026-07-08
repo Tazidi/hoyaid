@@ -4,6 +4,7 @@ import 'package:hoyaid/features/classification/services/classification_config_se
 import 'package:hoyaid/features/classification/services/classification_pipeline_service.dart';
 import 'package:hoyaid/features/classification/services/classification_service.dart';
 import 'package:hoyaid/features/classification/services/image_preprocess_service.dart';
+import 'package:hoyaid/features/classification/services/image_quality_service.dart';
 import 'package:hoyaid/features/classification/services/label_map_service.dart';
 import 'package:hoyaid/features/classification/services/location_service.dart';
 import 'package:hoyaid/features/classification/services/ood_service.dart';
@@ -21,6 +22,10 @@ final labelMapServiceProvider = Provider<LabelMapService>((ref) {
 
 final imagePreprocessServiceProvider = Provider<ImagePreprocessService>((ref) {
   return ImagePreprocessService();
+});
+
+final imageQualityServiceProvider = Provider<ImageQualityService>((ref) {
+  return ImageQualityService();
 });
 
 final oodServiceProvider = Provider<OodService>((ref) {
@@ -54,6 +59,7 @@ final classificationPipelineServiceProvider =
     configService: ref.watch(classificationConfigServiceProvider),
     labelMapService: ref.watch(labelMapServiceProvider),
     imagePreprocessService: ref.watch(imagePreprocessServiceProvider),
+    imageQualityService: ref.watch(imageQualityServiceProvider),
     tfliteService: ref.watch(tfliteServiceProvider),
     locationService: ref.watch(locationServiceProvider),
   );

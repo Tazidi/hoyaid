@@ -67,13 +67,66 @@ class ProcessedImage {
   final Object modelInput;
   final int modelSize;
   final int displaySize;
+  final bool enhancementApplied;
 
   const ProcessedImage({
     required this.displayJpegBytes,
     required this.modelInput,
     required this.modelSize,
     required this.displaySize,
+    this.enhancementApplied = false,
   });
+}
+
+enum ImageQualityIssue {
+  blur,
+  tooDark,
+  tooBright,
+  objectTooSmall,
+}
+
+class ImageQualityReport {
+  final double blurScore;
+  final double brightness;
+  final double brightPixelRatio;
+  final double contentFrameRatio;
+  final Set<ImageQualityIssue> issues;
+
+  const ImageQualityReport({
+    required this.blurScore,
+    required this.brightness,
+    required this.brightPixelRatio,
+    required this.contentFrameRatio,
+    required this.issues,
+  });
+
+  bool get hasWarning => issues.isNotEmpty;
+
+  bool get needsBrightnessEnhancement =>
+      issues.contains(ImageQualityIssue.tooDark);
+
+  String get userMessage {
+    if (!hasWarning) {
+      return 'Kualitas foto cukup baik untuk klasifikasi.';
+    }
+
+    final details = <String>[];
+    if (issues.contains(ImageQualityIssue.blur)) {
+      details.add('foto terlihat kurang fokus atau buram');
+    }
+    if (issues.contains(ImageQualityIssue.tooDark)) {
+      details.add('pencahayaan terlalu gelap');
+    }
+    if (issues.contains(ImageQualityIssue.tooBright)) {
+      details.add('pencahayaan terlalu terang');
+    }
+    if (issues.contains(ImageQualityIssue.objectTooSmall)) {
+      details.add('objek tanaman kurang memenuhi frame');
+    }
+
+    return 'Foto perlu diperhatikan: ${details.join(', ')}. '
+        'Ambil ulang dengan daun memenuhi frame, pencahayaan cukup, dan kamera tidak goyang.';
+  }
 }
 
 enum ClassificationLocationSource {
@@ -128,6 +181,8 @@ class ClassificationDraft {
   final DateTime createdAt;
   final int modelImageSize;
   final int displayImageSize;
+  final ImageQualityReport imageQuality;
+  final bool enhancementApplied;
 
   const ClassificationDraft({
     required this.sourceImagePath,
@@ -137,6 +192,8 @@ class ClassificationDraft {
     required this.createdAt,
     required this.modelImageSize,
     required this.displayImageSize,
+    required this.imageQuality,
+    required this.enhancementApplied,
   });
 }
 

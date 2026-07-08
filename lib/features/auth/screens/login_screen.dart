@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hoyaid/core/utils/error_messages.dart';
 import 'package:hoyaid/features/auth/providers/auth_provider.dart';
+import 'package:hoyaid/shared/widgets/interactive.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -93,9 +94,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              colorScheme.primary.withValues(alpha: 0.20),
-              Theme.of(context).scaffoldBackgroundColor,
-              colorScheme.secondary.withValues(alpha: 0.12),
+              colorScheme.primary.withValues(alpha: 0.28),
+              colorScheme.surface,
+              colorScheme.tertiaryContainer.withValues(alpha: 0.45),
             ],
           ),
         ),
@@ -108,11 +109,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _BrandHeader(color: colorScheme.primary),
+                    FadeSlideIn(
+                      offsetY: 14,
+                      child: _BrandHeader(color: colorScheme.primary),
+                    ),
                     const SizedBox(height: 22),
-                    Card(
+                    FadeSlideIn(
+                      delay: const Duration(milliseconds: 140),
+                      child: Card(
+                      elevation: 0,
+                      color: colorScheme.surface.withValues(alpha: 0.92),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(28),
+                        side: BorderSide(
+                          color: colorScheme.outlineVariant
+                              .withValues(alpha: 0.55),
+                        ),
+                      ),
                       child: Padding(
-                        padding: const EdgeInsets.all(22),
+                        padding: const EdgeInsets.all(24),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
@@ -128,26 +143,55 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               'Simpan riwayat klasifikasi dan jelajahi data Hoya dengan lebih nyaman.',
                               style: Theme.of(context).textTheme.bodyMedium,
                             ),
+                            const SizedBox(height: 18),
+                            const Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                _FeaturePill(
+                                  icon: Icons.photo_camera_rounded,
+                                  label: 'Identifikasi cepat',
+                                ),
+                                _FeaturePill(
+                                  icon: Icons.history_rounded,
+                                  label: 'Riwayat tersimpan',
+                                ),
+                              ],
+                            ),
                             const SizedBox(height: 22),
                             TextField(
                               controller: _emailController,
                               keyboardType: TextInputType.emailAddress,
-                              decoration: const InputDecoration(
+                              decoration: InputDecoration(
                                 labelText: 'Email',
-                                prefixIcon: Icon(Icons.email_rounded),
+                                hintText: 'nama@email.com',
+                                prefixIcon: const Icon(Icons.email_rounded),
+                                filled: true,
+                                fillColor: colorScheme.surfaceContainerHighest
+                                    .withValues(alpha: 0.45),
                               ),
                             ),
                             const SizedBox(height: 14),
                             TextField(
                               controller: _passwordController,
                               obscureText: true,
-                              decoration: const InputDecoration(
+                              decoration: InputDecoration(
                                 labelText: 'Kata Sandi',
-                                prefixIcon: Icon(Icons.lock_rounded),
+                                hintText: 'Masukkan kata sandi',
+                                prefixIcon: const Icon(Icons.lock_rounded),
+                                filled: true,
+                                fillColor: colorScheme.surfaceContainerHighest
+                                    .withValues(alpha: 0.45),
                               ),
                             ),
                             const SizedBox(height: 22),
                             FilledButton.icon(
+                              style: FilledButton.styleFrom(
+                                minimumSize: const Size.fromHeight(52),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(18),
+                                ),
+                              ),
                               onPressed: _isBusy ? null : _loginEmail,
                               icon: _isLoading
                                   ? const _SmallLoader()
@@ -156,6 +200,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             ),
                             const SizedBox(height: 12),
                             OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size.fromHeight(50),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(18),
+                                ),
+                              ),
                               onPressed: _isBusy ? null : _loginGoogle,
                               icon: _isGoogleLoading
                                   ? const _SmallLoader()
@@ -175,22 +225,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                       ),
                     ),
+                    ),
                     const SizedBox(height: 18),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text('Belum punya akun? ',
-                            style: TextStyle(color: Colors.grey.shade700)),
-                        GestureDetector(
-                          onTap: () => context.push('/register'),
-                          child: Text(
-                            'Daftar',
-                            style: TextStyle(
-                                color: colorScheme.primary,
-                                fontWeight: FontWeight.w900),
+                    FadeSlideIn(
+                      delay: const Duration(milliseconds: 260),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text('Belum punya akun? ',
+                              style: TextStyle(color: Colors.grey.shade700)),
+                          GestureDetector(
+                            onTap: () => context.push('/register'),
+                            child: Text(
+                              'Daftar',
+                              style: TextStyle(
+                                  color: colorScheme.primary,
+                                  fontWeight: FontWeight.w900),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -213,10 +267,17 @@ class _BrandHeader extends StatelessWidget {
     return Column(
       children: [
         Container(
-          width: 94,
-          height: 94,
+          width: 104,
+          height: 104,
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.88),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.white.withValues(alpha: 0.95),
+                color.withValues(alpha: 0.18),
+              ],
+            ),
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
@@ -226,11 +287,25 @@ class _BrandHeader extends StatelessWidget {
               ),
             ],
           ),
-          child: Icon(Icons.local_florist_rounded, size: 54, color: color),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Icon(Icons.local_florist_rounded, size: 58, color: color),
+              Positioned(
+                right: 22,
+                top: 22,
+                child: Icon(
+                  Icons.auto_awesome_rounded,
+                  size: 18,
+                  color: Theme.of(context).colorScheme.tertiary,
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 16),
         Text(
-          'HoyaID',
+          'iHoya',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                 fontWeight: FontWeight.w900,
@@ -244,6 +319,40 @@ class _BrandHeader extends StatelessWidget {
           style: Theme.of(context).textTheme.bodyMedium,
         ),
       ],
+    );
+  }
+}
+
+class _FeaturePill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _FeaturePill({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: colorScheme.primaryContainer.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: colorScheme.primary),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: colorScheme.onPrimaryContainer,
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -7,6 +7,7 @@ import 'package:hoyaid/features/history/models/classification_record.dart';
 import 'package:hoyaid/features/history/providers/history_provider.dart';
 import 'package:hoyaid/features/species/models/hoya_species.dart';
 import 'package:hoyaid/features/species/providers/species_provider.dart';
+import 'package:hoyaid/shared/widgets/interactive.dart';
 import 'package:intl/intl.dart';
 
 class HistoryScreen extends StatelessWidget {
@@ -122,12 +123,16 @@ class _HistoryListTabState extends ConsumerState<_HistoryListTab> {
                   message: 'Data yang cocok dengan filter belum tersedia.',
                 )
               else
-                for (final record in data.items) ...[
-                  _ClassificationCard(
-                    record: record,
-                    species: speciesById[record.speciesId],
-                    onTap: () => context.push(
-                      '/history/${record.classificationId}',
+                for (final (index, record) in data.items.indexed) ...[
+                  FadeSlideIn(
+                    delay: Duration(milliseconds: (index * 40).clamp(0, 320)),
+                    offsetY: 16,
+                    child: _ClassificationCard(
+                      record: record,
+                      species: speciesById[record.speciesId],
+                      onTap: () => context.push(
+                        '/history/${record.classificationId}',
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -151,7 +156,7 @@ class _HistoryListTabState extends ConsumerState<_HistoryListTab> {
           ),
         );
       },
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => const _HistoryLoadingSkeleton(),
       error: (error, _) => _ErrorState(
         message: readableErrorMessage(
           error,
@@ -459,7 +464,9 @@ class _ClassificationCard extends StatelessWidget {
         ? '-'
         : DateFormat('dd MMM yyyy HH:mm').format(record.createdAt!);
 
-    return Card(
+    return PressableScale(
+      pressedScale: 0.97,
+      child: Card(
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(8),
@@ -533,6 +540,34 @@ class _ClassificationCard extends StatelessWidget {
           ),
         ),
       ),
+      ),
+    );
+  }
+}
+
+/// Skeleton shimmer untuk daftar riwayat saat memuat.
+class _HistoryLoadingSkeleton extends StatelessWidget {
+  const _HistoryLoadingSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        const ShimmerBox(
+          height: 72,
+          borderRadius: BorderRadius.all(Radius.circular(12)),
+        ),
+        const SizedBox(height: 12),
+        for (int i = 0; i < 5; i++)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 12),
+            child: ShimmerBox(
+              height: 112,
+              borderRadius: BorderRadius.all(Radius.circular(12)),
+            ),
+          ),
+      ],
     );
   }
 }

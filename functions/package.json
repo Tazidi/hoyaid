@@ -1,6 +1,6 @@
 {
   "name": "functions",
-  "description": "Cloud Functions for HoyaID",
+  "description": "Cloud Functions for iHoya",
   "engines": {
     "node": "20"
   },

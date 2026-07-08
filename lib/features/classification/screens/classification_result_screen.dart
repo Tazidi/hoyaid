@@ -10,6 +10,7 @@ import 'package:hoyaid/features/classification/models/classification_models.dart
 import 'package:hoyaid/features/classification/providers/classification_provider.dart';
 import 'package:hoyaid/features/classification/services/classification_service.dart';
 import 'package:hoyaid/features/species/providers/species_provider.dart';
+import 'package:hoyaid/shared/widgets/interactive.dart';
 
 class ClassificationResultScreen extends ConsumerStatefulWidget {
   final ClassificationDraft? draft;
@@ -119,7 +120,8 @@ class _ClassificationResultScreenState
             content: Text(
               readableErrorMessage(
                 error,
-                fallback: 'Gagal membaca lokasi. Anda bisa memasang pin manual.',
+                fallback:
+                    'Gagal membaca lokasi. Anda bisa memasang pin manual.',
               ),
             ),
           ),
@@ -322,30 +324,35 @@ class _ClassificationResultScreenState
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: AspectRatio(
-                aspectRatio: 1,
-                child: Image.memory(
-                  draft.displayJpegBytes,
-                  fit: BoxFit.cover,
-                  // Greyed-out jika rejected agar user tahu ini hasil sangat meragukan
-                  color: isRejected
-                      ? Colors.grey.withValues(alpha: 0.55)
-                      : null,
-                  colorBlendMode: isRejected ? BlendMode.saturation : null,
-                ),
+            FadeSlideIn(
+              child: _HeroImage(
+                bytes: draft.displayJpegBytes,
+                isRejected: isRejected,
               ),
             ),
             const SizedBox(height: 16),
 
-            // Banner rejected — tampil sebelum header prediksi
-            if (isRejected) ...[
-              _RejectedBanner(prediction: draft.prediction),
+            if (draft.imageQuality.hasWarning || draft.enhancementApplied) ...[
+              FadeSlideIn(
+                delay: const Duration(milliseconds: 60),
+                child: _ImageQualityPanel(draft: draft),
+              ),
               const SizedBox(height: 12),
             ],
 
-            _PredictionHeader(draft: draft),
+            // Banner rejected — tampil sebelum header prediksi
+            if (isRejected) ...[
+              FadeSlideIn(
+                delay: const Duration(milliseconds: 60),
+                child: _RejectedBanner(prediction: draft.prediction),
+              ),
+              const SizedBox(height: 12),
+            ],
+
+            FadeSlideIn(
+              delay: const Duration(milliseconds: 120),
+              child: _PredictionHeader(draft: draft),
+            ),
 
             // Warning uncertain (hanya bila bukan rejected)
             if (!isRejected &&
@@ -355,35 +362,60 @@ class _ClassificationResultScreenState
               _WarningPanel(prediction: draft.prediction),
             ],
             const SizedBox(height: 16),
-            speciesAsync.when(
-              data: (species) => _SpeciesInfoPanel(
-                speciesName: species?.displayName ?? draft.prediction.speciesId,
-                description: species?.description,
-                distribution: species?.distribution,
-                medicalUse: species?.medicalUseDescription,
-              ),
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (_, __) => _SpeciesInfoPanel(
-                speciesName: draft.prediction.speciesId,
-                description: 'Info spesies belum tersedia.',
+            FadeSlideIn(
+              delay: const Duration(milliseconds: 180),
+              child: speciesAsync.when(
+                data: (species) => _SpeciesInfoPanel(
+                  speciesName:
+                      species?.displayName ?? draft.prediction.speciesId,
+                  description: species?.description,
+                  distribution: species?.distribution,
+                  medicalUse: species?.medicalUseDescription,
+                ),
+                loading: () => const SectionCard(
+                  icon: Icons.local_florist_rounded,
+                  title: 'Info Spesies',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ShimmerBox(width: 160, height: 18),
+                      SizedBox(height: 10),
+                      ShimmerBox(height: 14),
+                      SizedBox(height: 6),
+                      ShimmerBox(width: 220, height: 14),
+                    ],
+                  ),
+                ),
+                error: (_, __) => _SpeciesInfoPanel(
+                  speciesName: draft.prediction.speciesId,
+                  description: 'Info spesies belum tersedia.',
+                ),
               ),
             ),
             const SizedBox(height: 16),
-            _TopPredictionsPanel(predictions: draft.prediction.topPredictions),
+            FadeSlideIn(
+              delay: const Duration(milliseconds: 240),
+              child: _TopPredictionsPanel(
+                predictions: draft.prediction.topPredictions,
+              ),
+            ),
             const SizedBox(height: 16),
             // Panel lokasi hanya tampil jika bukan rejected
             if (!isRejected) ...[
-              _LocationPanel(
-                location: _location,
-                latitudeController: _latitudeController,
-                longitudeController: _longitudeController,
-                isGettingGps: _isGettingGps,
-                onUseGps: _useGpsLocation,
-                onPickManual: _pickManualLocation,
-                onApplyCoordinates: () {
-                  if (_applyTypedCoordinates()) setState(() {});
-                },
-                onClear: () => _setLocation(null),
+              FadeSlideIn(
+                delay: const Duration(milliseconds: 300),
+                child: _LocationPanel(
+                  location: _location,
+                  latitudeController: _latitudeController,
+                  longitudeController: _longitudeController,
+                  isGettingGps: _isGettingGps,
+                  onUseGps: _useGpsLocation,
+                  onPickManual: _pickManualLocation,
+                  onApplyCoordinates: () {
+                    if (_applyTypedCoordinates()) setState(() {});
+                  },
+                  onClear: () => _setLocation(null),
+                ),
               ),
               const SizedBox(height: 16),
             ],
@@ -405,6 +437,56 @@ class _ClassificationResultScreenState
   }
 }
 
+/// Gambar hasil klasifikasi dengan sudut membulat besar + bayangan.
+class _HeroImage extends StatelessWidget {
+  final Uint8List bytes;
+  final bool isRejected;
+
+  const _HeroImage({required this.bytes, required this.isRejected});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.16),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: AspectRatio(
+          aspectRatio: 1,
+          child: Image.memory(
+            bytes,
+            fit: BoxFit.cover,
+            // Greyed-out jika rejected agar user tahu ini hasil sangat meragukan
+            color: isRejected ? Colors.grey.withValues(alpha: 0.55) : null,
+            colorBlendMode: isRejected ? BlendMode.saturation : null,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Warna berdasarkan level confidence.
+Color _confidenceColor(double confidence) {
+  if (confidence >= 0.8) return const Color(0xFF2E9E5B);
+  if (confidence >= 0.6) return const Color(0xFFE08B2D);
+  return const Color(0xFFD64545);
+}
+
+String _confidenceLabel(double confidence) {
+  if (confidence >= 0.8) return 'Keyakinan tinggi';
+  if (confidence >= 0.6) return 'Keyakinan sedang';
+  return 'Keyakinan rendah';
+}
+
 class _PredictionHeader extends StatelessWidget {
   final ClassificationDraft draft;
 
@@ -414,63 +496,166 @@ class _PredictionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final prediction = draft.prediction;
     final confidence = prediction.confidence;
+    final color = _confidenceColor(confidence);
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Text(
-                    prediction.speciesId,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                ),
-                _ConfidenceBadge(confidence: confidence),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text('Model: ${prediction.modelVersion}'),
-            Text(
-              'OOD score: ${prediction.ood.score.toStringAsFixed(2)} | '
-              'margin top-1/top-2: ${prediction.ood.topMargin.toStringAsFixed(2)}',
-            ),
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            color.withValues(alpha: 0.14),
+            color.withValues(alpha: 0.04),
           ],
         ),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(11),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: Icon(Icons.local_florist_rounded, color: color),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Prediksi teratas',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5,
+                          ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      prediction.speciesId,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w900,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                _confidenceLabel(confidence),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: color,
+                      fontWeight: FontWeight.w800,
+                    ),
+              ),
+              AnimatedCountUp(
+                value: (confidence * 100).round(),
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: color,
+                      fontWeight: FontWeight.w900,
+                    ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          AnimatedProgressBar(value: confidence, color: color, height: 12),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              StatChip(
+                icon: Icons.memory_rounded,
+                label: 'Model ${prediction.modelVersion}',
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              StatChip(
+                icon: Icons.analytics_outlined,
+                label: 'OOD ${prediction.ood.score.toStringAsFixed(2)}',
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              StatChip(
+                icon: Icons.compare_arrows_rounded,
+                label: 'Margin ${prediction.ood.topMargin.toStringAsFixed(2)}',
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 }
 
-class _ConfidenceBadge extends StatelessWidget {
-  final double confidence;
+class _ImageQualityPanel extends StatelessWidget {
+  final ClassificationDraft draft;
 
-  const _ConfidenceBadge({required this.confidence});
+  const _ImageQualityPanel({required this.draft});
 
   @override
   Widget build(BuildContext context) {
-    final color = confidence >= 0.8
-        ? Colors.green
-        : confidence >= 0.6
-            ? Colors.orange
-            : Colors.red;
+    final colorScheme = Theme.of(context).colorScheme;
+    final report = draft.imageQuality;
+    final metrics = [
+      'Blur ${report.blurScore.toStringAsFixed(0)}',
+      'Brightness ${report.brightness.toStringAsFixed(0)}',
+      'Frame ${(report.contentFrameRatio * 100).toStringAsFixed(0)}%',
+    ].join(' • ');
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
-      ),
+    return Material(
+      color: Colors.amber.withValues(alpha: 0.16),
+      borderRadius: BorderRadius.circular(8),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        child: Text(
-          '${(confidence * 100).toStringAsFixed(1)}%',
-          style: TextStyle(color: color, fontWeight: FontWeight.bold),
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.photo_camera_back_outlined),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Pemeriksaan kualitas foto',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(report.userMessage),
+                  if (draft.enhancementApplied) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      'Enhancement ringan diterapkan: brightness dan contrast dinaikkan secukupnya.',
+                      style: TextStyle(color: colorScheme.onSurfaceVariant),
+                    ),
+                  ],
+                  const SizedBox(height: 6),
+                  Text(
+                    metrics,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -521,41 +706,68 @@ class _SpeciesInfoPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+    return SectionCard(
+      icon: Icons.local_florist_rounded,
+      title: 'Info Spesies',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            speciesName,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+          ),
+          if (description?.isNotEmpty == true) ...[
+            const SizedBox(height: 8),
             Text(
-              speciesName,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+              description!,
+              style:
+                  Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.5),
             ),
-            if (description?.isNotEmpty == true) ...[
-              const SizedBox(height: 8),
-              Text(description!),
-            ],
-            if (distribution?.isNotEmpty == true) ...[
-              const SizedBox(height: 12),
-              Text(
-                'Persebaran',
-                style: Theme.of(context).textTheme.labelLarge,
-              ),
-              Text(distribution!),
-            ],
-            if (medicalUse?.isNotEmpty == true) ...[
-              const SizedBox(height: 12),
-              Text(
-                'Pemanfaatan medis',
-                style: Theme.of(context).textTheme.labelLarge,
-              ),
-              Text(medicalUse!),
-            ],
           ],
-        ),
+          if (distribution?.isNotEmpty == true) ...[
+            const SizedBox(height: 14),
+            const _MiniLabel(icon: Icons.public_rounded, text: 'Persebaran'),
+            const SizedBox(height: 4),
+            Text(distribution!,
+                style: Theme.of(context).textTheme.bodyMedium),
+          ],
+          if (medicalUse?.isNotEmpty == true) ...[
+            const SizedBox(height: 14),
+            const _MiniLabel(
+                icon: Icons.medical_services_outlined,
+                text: 'Pemanfaatan medis'),
+            const SizedBox(height: 4),
+            Text(medicalUse!, style: Theme.of(context).textTheme.bodyMedium),
+          ],
+        ],
       ),
+    );
+  }
+}
+
+class _MiniLabel extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _MiniLabel({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.primary;
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: 6),
+        Text(
+          text,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: color,
+                fontWeight: FontWeight.w800,
+              ),
+        ),
+      ],
     );
   }
 }
@@ -567,32 +779,94 @@ class _TopPredictionsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Top Predictions',
-              style: Theme.of(context).textTheme.titleMedium,
+    return SectionCard(
+      icon: Icons.leaderboard_rounded,
+      title: 'Kandidat Teratas',
+      accent: const Color(0xFF0E9F9A),
+      child: Column(
+        children: [
+          for (final (index, prediction) in predictions.indexed) ...[
+            if (index > 0) const SizedBox(height: 14),
+            _PredictionRow(
+              rank: index + 1,
+              prediction: prediction,
             ),
-            const SizedBox(height: 8),
-            for (final prediction in predictions)
-              ListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                title: Text(prediction.speciesId),
-                subtitle: LinearProgressIndicator(
-                  value: prediction.confidence.clamp(0.0, 1.0).toDouble(),
-                ),
-                trailing: Text(
-                  '${(prediction.confidence * 100).toStringAsFixed(1)}%',
-                ),
-              ),
           ],
-        ),
+        ],
       ),
+    );
+  }
+}
+
+class _PredictionRow extends StatelessWidget {
+  final int rank;
+  final TopPrediction prediction;
+
+  const _PredictionRow({required this.rank, required this.prediction});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final confidence = prediction.confidence.clamp(0.0, 1.0).toDouble();
+    // Peringkat 1 memakai warna primer, sisanya lebih netral.
+    final barColor = rank == 1 ? colorScheme.primary : colorScheme.tertiary;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Container(
+          width: 26,
+          height: 26,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: barColor.withValues(alpha: 0.14),
+            shape: BoxShape.circle,
+          ),
+          child: Text(
+            '$rank',
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: barColor,
+                  fontWeight: FontWeight.w900,
+                ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      prediction.speciesId,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${(confidence * 100).toStringAsFixed(1)}%',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: barColor,
+                        ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              AnimatedProgressBar(
+                value: confidence,
+                color: barColor,
+                height: 8,
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -645,8 +919,8 @@ class _LocationPanel extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            Text(location?.label ??
-                'Lokasi wajib diisi sebelum data disimpan.'),
+            Text(
+                location?.label ?? 'Lokasi wajib diisi sebelum data disimpan.'),
             const SizedBox(height: 12),
             Row(
               children: [
@@ -763,8 +1037,8 @@ class _SavePanel extends StatelessWidget {
                       : 'Status: belum tersimpan. Klasifikasi tetap bisa dilihat di layar ini sebelum disimpan.',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: isRejected ? Theme.of(context).colorScheme.error : null,
-          ),
+                color: isRejected ? Theme.of(context).colorScheme.error : null,
+              ),
         ),
         if (failureMessage != null) ...[
           const SizedBox(height: 12),

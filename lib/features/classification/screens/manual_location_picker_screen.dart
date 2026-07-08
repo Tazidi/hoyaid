@@ -15,31 +15,33 @@ class ManualLocationPickerScreen extends StatefulWidget {
 class _ManualLocationPickerScreenState
     extends State<ManualLocationPickerScreen> {
   static const _initialCenter = LatLng(-2.5489, 118.0149);
-  LatLng? _selectedPoint;
+  static const _initialZoom = 4.7;
+
+  final MapController _mapController = MapController();
+  LatLng _selectedPoint = _initialCenter;
 
   void _saveSelection() {
-    final point = _selectedPoint;
-    if (point == null) return;
-
     context.pop<ClassificationLocation>(
       ClassificationLocation(
-        latitude: point.latitude,
-        longitude: point.longitude,
+        latitude: _selectedPoint.latitude,
+        longitude: _selectedPoint.longitude,
         source: ClassificationLocationSource.manual,
       ),
     );
   }
 
+  void _selectPoint(TapPosition _, LatLng point) {
+    setState(() => _selectedPoint = point);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final selected = _selectedPoint;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Pilih Lokasi'),
         actions: [
           TextButton(
-            onPressed: selected == null ? null : _saveSelection,
+            onPressed: _saveSelection,
             child: const Text('Simpan'),
           ),
         ],
@@ -49,62 +51,73 @@ class _ManualLocationPickerScreenState
         children: [
           Positioned.fill(
             child: FlutterMap(
+              mapController: _mapController,
               options: MapOptions(
-                initialCenter: selected ?? _initialCenter,
-                initialZoom: 4.7,
-                onTap: (_, point) => setState(() => _selectedPoint = point),
+                initialCenter: _initialCenter,
+                initialZoom: _initialZoom,
+                minZoom: 3,
+                maxZoom: 18,
+                onTap: _selectPoint,
               ),
               children: [
                 TileLayer(
                   urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                   userAgentPackageName: 'com.tazidi.hoyaid',
                 ),
-                if (selected != null)
-                  MarkerLayer(
-                    markers: [
-                      Marker(
-                        point: selected,
-                        width: 48,
-                        height: 48,
-                        child: const Icon(
-                          Icons.location_pin,
-                          color: Colors.red,
-                          size: 44,
-                        ),
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: _selectedPoint,
+                      width: 48,
+                      height: 48,
+                      child: const Icon(
+                        Icons.location_pin,
+                        color: Colors.red,
+                        size: 44,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
           Positioned(
-            left: 16,
-            right: 16,
-            bottom: 16,
+            left: 0,
+            right: 0,
+            bottom: 0,
             child: SafeArea(
-              child: Material(
-                elevation: 3,
-                borderRadius: BorderRadius.circular(8),
-                color: Theme.of(context).colorScheme.surface,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.touch_app_outlined),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          selected == null
-                              ? 'Tap peta untuk menandai lokasi.'
-                              : '${selected.latitude.toStringAsFixed(5)}, '
-                                  '${selected.longitude.toStringAsFixed(5)}',
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                child: Material(
+                  elevation: 8,
+                  borderRadius: BorderRadius.circular(16),
+                  color: Theme.of(context).colorScheme.surface,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                    // Only an Icon + Expanded here — no trailing non-flexible
+                    // widget. A RenderFlex measures its non-flex children with
+                    // an unbounded main-axis width, and during the route's
+                    // offstage push transition the whole body is briefly laid
+                    // out unbounded; a fixed-size child (e.g. a FilledButton)
+                    // would then be asked to lay out at infinite width and
+                    // throw, poisoning the subtree and leaving the screen blank
+                    // and frozen. Expanded absorbs the width instead, and the
+                    // AppBar "Simpan" action already covers saving.
+                    child: Row(
+                      children: [
+                        const Icon(Icons.touch_app_outlined),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Ketuk peta untuk memilih titik, lalu tekan '
+                            'Simpan. Terpilih: '
+                            '${_selectedPoint.latitude.toStringAsFixed(5)}, '
+                            '${_selectedPoint.longitude.toStringAsFixed(5)}',
+                          ),
                         ),
-                      ),
-                      FilledButton(
-                        onPressed: selected == null ? null : _saveSelection,
-                        child: const Text('Pakai'),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),

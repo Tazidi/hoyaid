@@ -78,11 +78,12 @@ class _ClassificationScreenState extends ConsumerState<ClassificationScreen> {
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
             colors: [
-              colorScheme.primary.withValues(alpha: 0.16),
-              Theme.of(context).scaffoldBackgroundColor,
+              colorScheme.primary.withValues(alpha: 0.22),
+              colorScheme.surface,
+              colorScheme.secondaryContainer.withValues(alpha: 0.42),
             ],
           ),
         ),
@@ -111,8 +112,6 @@ class _ClassificationScreenState extends ConsumerState<ClassificationScreen> {
                   const SizedBox(height: 16),
                   _ErrorPanel(message: _errorMessage!),
                 ],
-                const SizedBox(height: 16),
-                _BatchStatusPanel(isClassifying: _isClassifying),
               ],
             ],
           ),
@@ -129,58 +128,139 @@ class _IntroPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Container(
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(32),
         gradient: const LinearGradient(
-          colors: [Color(0xFF173D2E), Color(0xFF1B7F5A)],
+          colors: [Color(0xFF12382C), Color(0xFF1F8A70), Color(0xFF6AA84F)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.primary.withValues(alpha: 0.24),
+            blurRadius: 32,
+            offset: const Offset(0, 18),
+          ),
+        ],
       ),
-      child: Row(
+      child: Stack(
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  isClassifying
-                      ? 'Sedang membaca pola daun...'
-                      : 'Siap identifikasi spesies?',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w900,
-                      ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Gunakan foto yang terang, fokus, dan menampilkan bagian tanaman secara jelas.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.86),
-                        height: 1.45,
-                      ),
-                ),
-              ],
+          Positioned(
+            right: -28,
+            top: -36,
+            child: Icon(
+              Icons.local_florist_rounded,
+              size: 156,
+              color: Colors.white.withValues(alpha: 0.08),
             ),
           ),
-          const SizedBox(width: 14),
-          Container(
-            width: 76,
-            height: 76,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.16),
-              shape: BoxShape.circle,
-            ),
-            child: isClassifying
-                ? const Padding(
-                    padding: EdgeInsets.all(24),
-                    child: CircularProgressIndicator(
-                        color: Colors.white, strokeWidth: 3),
-                  )
-                : const Icon(Icons.camera_alt_rounded,
-                    color: Colors.white, size: 40),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    isClassifying
+                        ? const SizedBox.square(
+                            dimension: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(
+                            Icons.auto_awesome_rounded,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                    const SizedBox(width: 7),
+                    Text(
+                      isClassifying ? 'Memproses foto' : 'Identifikasi cepat',
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                isClassifying
+                    ? 'Sebentar, foto sedang dianalisis.'
+                    : 'Foto daun atau bunga Hoya, lalu biarkan iHoya mengenalinya.',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      height: 1.12,
+                    ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Gunakan gambar yang terang, fokus, dan menampilkan bagian tanaman dengan jelas untuk hasil yang lebih baik.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.88),
+                      height: 1.45,
+                    ),
+              ),
+              const SizedBox(height: 18),
+              const Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _PhotoTip(
+                      icon: Icons.wb_sunny_rounded, label: 'Cahaya cukup'),
+                  _PhotoTip(
+                      icon: Icons.center_focus_strong_rounded,
+                      label: 'Objek fokus'),
+                  _PhotoTip(
+                      icon: Icons.eco_rounded, label: 'Daun/bunga terlihat'),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PhotoTip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _PhotoTip({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white, size: 15),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                ),
           ),
         ],
       ),
@@ -246,6 +326,7 @@ class _QuotaPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final uploadUsed = (userData?['uploadUsed'] as num?)?.toInt() ?? 0;
     final uploadLimit = (userData?['uploadLimit'] as num?)?.toInt() ?? 5;
     final isFull = uploadUsed >= uploadLimit;
@@ -255,6 +336,9 @@ class _QuotaPanel extends StatelessWidget {
     final remaining = (uploadLimit - uploadUsed).clamp(0, uploadLimit);
 
     return Card(
+      elevation: 0,
+      color: colorScheme.surface.withValues(alpha: 0.92),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       child: Padding(
         padding: const EdgeInsets.all(18),
         child: Column(
@@ -263,47 +347,59 @@ class _QuotaPanel extends StatelessWidget {
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  width: 46,
+                  height: 46,
                   decoration: BoxDecoration(
-                    color: (isFull
-                            ? Colors.orange
-                            : Theme.of(context).colorScheme.primary)
+                    color: (isFull ? Colors.orange : colorScheme.primary)
                         .withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: Icon(isFull
-                      ? Icons.warning_rounded
-                      : Icons.cloud_upload_rounded),
+                  child: Icon(
+                    isFull ? Icons.warning_amber_rounded : Icons.bolt_rounded,
+                    color: isFull ? Colors.orange : colorScheme.primary,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Kuota unggah',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w800)),
-                      Text(isFull
-                          ? 'Kuota penuh sementara'
-                          : 'Tersisa $remaining kali klasifikasi'),
+                      Text(
+                        isFull
+                            ? 'Kuota hampir penuh'
+                            : 'Sisa $remaining kali klasifikasi',
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w900,
+                                ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '$uploadUsed dari $uploadLimit kuota sudah digunakan',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                      ),
                     ],
                   ),
                 ),
-                Text('$uploadUsed/$uploadLimit',
-                    style: const TextStyle(fontWeight: FontWeight.w800)),
               ],
             ),
             const SizedBox(height: 14),
             ClipRRect(
               borderRadius: BorderRadius.circular(999),
-              child: LinearProgressIndicator(value: progress, minHeight: 10),
+              child: LinearProgressIndicator(
+                value: progress,
+                minHeight: 10,
+                backgroundColor: colorScheme.surfaceContainerHighest,
+              ),
             ),
             if (isFull) ...[
               const SizedBox(height: 12),
-              const Text(
-                  'Anda masih bisa mencoba klasifikasi, tetapi penyimpanan dapat ditolak server sampai kuota tersedia.'),
+              Text(
+                'Anda masih bisa mencoba, namun penyimpanan hasil dapat ditolak sampai kuota tersedia.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
             ],
           ],
         ),
@@ -316,73 +412,112 @@ class _CapturePanel extends StatelessWidget {
   final bool isClassifying;
   final VoidCallback onOpenCamera;
 
-  const _CapturePanel(
-      {required this.isClassifying, required this.onOpenCamera});
+  const _CapturePanel({
+    required this.isClassifying,
+    required this.onOpenCamera,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Card(
+      elevation: 0,
+      color: colorScheme.surface.withValues(alpha: 0.94),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Container(
-              height: 150,
+              height: 178,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(26),
                 gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                   colors: [
-                    Theme.of(context)
-                        .colorScheme
-                        .primary
-                        .withValues(alpha: 0.12),
-                    const Color(0xFFE8F5E9),
+                    colorScheme.primary.withValues(alpha: 0.16),
+                    colorScheme.tertiaryContainer.withValues(alpha: 0.54),
                   ],
                 ),
               ),
               child: Stack(
                 children: [
                   Positioned(
-                    right: -18,
-                    bottom: -22,
-                    child: Icon(Icons.eco_rounded,
-                        size: 136,
-                        color: Theme.of(context)
-                            .colorScheme
-                            .primary
-                            .withValues(alpha: 0.16)),
+                    right: -20,
+                    bottom: -28,
+                    child: Icon(
+                      Icons.eco_rounded,
+                      size: 150,
+                      color: colorScheme.primary.withValues(alpha: 0.14),
+                    ),
                   ),
-                  const Center(
-                      child: Icon(Icons.add_a_photo_rounded, size: 56)),
+                  Positioned(
+                    left: 20,
+                    top: 20,
+                    child: Container(
+                      padding: const EdgeInsets.all(13),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surface.withValues(alpha: 0.82),
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Icon(
+                        Icons.add_a_photo_rounded,
+                        size: 36,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 20,
+                    right: 20,
+                    bottom: 18,
+                    child: Text(
+                      'Pastikan daun atau bunga memenuhi sebagian besar frame foto.',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                    ),
+                  ),
                 ],
               ),
             ),
             const SizedBox(height: 18),
             Text(
-              'Ambil foto daun atau bunga Hoya',
-              textAlign: TextAlign.center,
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(fontWeight: FontWeight.w800),
+              'Ambil foto tanaman Hoya',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
             ),
-            const SizedBox(height: 8),
-            const Text(
-              'Aplikasi akan memproses gambar lokal untuk model dan menyiapkan preview yang ringan untuk disimpan.',
-              textAlign: TextAlign.center,
+            const SizedBox(height: 6),
+            Text(
+              'Pilih foto terbaik dari kamera. Setelah diproses, Anda bisa meninjau hasil dan menambahkan lokasi bila diperlukan.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    height: 1.42,
+                  ),
             ),
             const SizedBox(height: 20),
             FilledButton.icon(
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(54),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                ),
+              ),
               onPressed: isClassifying ? null : onOpenCamera,
               icon: isClassifying
                   ? const SizedBox.square(
                       dimension: 18,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
                     )
                   : const Icon(Icons.camera_alt_rounded),
-              label: Text(isClassifying ? 'Memproses...' : 'Buka Kamera'),
+              label: Text(isClassifying ? 'Memproses foto...' : 'Buka Kamera'),
             ),
           ],
         ),
@@ -412,77 +547,6 @@ class _ErrorPanel extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _BatchStatusPanel extends StatelessWidget {
-  final bool isClassifying;
-
-  const _BatchStatusPanel({required this.isClassifying});
-
-  @override
-  Widget build(BuildContext context) {
-    const items = [
-      _StatusItem(
-          Icons.memory_rounded, 'Model TFLite', 'Membaca label spesies'),
-      _StatusItem(
-          Icons.image_rounded, 'Preprocess gambar', 'Resize 224/640 otomatis'),
-      _StatusItem(Icons.place_rounded, 'Lokasi opsional',
-          'Bisa ditambahkan setelah hasil'),
-    ];
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Alur proses',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w800)),
-            const SizedBox(height: 8),
-            for (final item in items)
-              _StatusRow(item: item, done: !isClassifying),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StatusItem {
-  final IconData icon;
-  final String label;
-  final String subtitle;
-
-  const _StatusItem(this.icon, this.label, this.subtitle);
-}
-
-class _StatusRow extends StatelessWidget {
-  final _StatusItem item;
-  final bool done;
-
-  const _StatusRow({required this.item, required this.done});
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      dense: true,
-      contentPadding: EdgeInsets.zero,
-      leading: CircleAvatar(
-        backgroundColor:
-            (done ? Colors.green : Colors.orange).withValues(alpha: 0.12),
-        child: Icon(item.icon, color: done ? Colors.green : Colors.orange),
-      ),
-      title:
-          Text(item.label, style: const TextStyle(fontWeight: FontWeight.w700)),
-      subtitle: Text(item.subtitle),
-      trailing: Icon(
-          done ? Icons.check_circle_rounded : Icons.hourglass_top_rounded,
-          color: done ? Colors.green : Colors.orange),
     );
   }
 }
@@ -531,11 +595,10 @@ class _NotAPlantPanel extends StatelessWidget {
                   children: [
                     Text(
                       'Bukan Tanaman Hoya',
-                      style:
-                          Theme.of(context).textTheme.titleMedium?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w900,
-                              ),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                          ),
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -561,7 +624,8 @@ class _NotAPlantPanel extends StatelessWidget {
               children: [
                 _SuggestionRow(
                   icon: Icons.eco_rounded,
-                  text: 'Pastikan foto menampilkan daun, bunga, atau bagian tanaman Hoya',
+                  text:
+                      'Pastikan foto menampilkan daun, bunga, atau bagian tanaman Hoya',
                 ),
                 SizedBox(height: 8),
                 _SuggestionRow(
@@ -571,7 +635,8 @@ class _NotAPlantPanel extends StatelessWidget {
                 SizedBox(height: 8),
                 _SuggestionRow(
                   icon: Icons.crop_free_rounded,
-                  text: 'Hindari foto benda lain: botol, orang, atau latar belakang kosong',
+                  text:
+                      'Hindari foto benda lain: botol, orang, atau latar belakang kosong',
                 ),
               ],
             ),

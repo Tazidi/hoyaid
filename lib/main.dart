@@ -54,7 +54,7 @@ class HoyaApp extends ConsumerWidget {
     final router = ref.watch(appRouterProvider);
 
     return MaterialApp.router(
-      title: 'HoyaID',
+      title: 'iHoya',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
@@ -63,4 +63,3 @@ class HoyaApp extends ConsumerWidget {
     );
   }
 }
-

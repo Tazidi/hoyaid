@@ -11,6 +11,7 @@ class ImagePreprocessService {
     required int displaySize,
     required bool floatInput,
     int? maxImageSizeMb,
+    bool enhanceLowLight = false,
   }) async {
     final file = File(imagePath);
     if (maxImageSizeMb != null && maxImageSizeMb > 0) {
@@ -31,14 +32,15 @@ class ImagePreprocessService {
 
     final oriented = img.bakeOrientation(decoded);
     final square = _centerCropSquare(oriented);
+    final enhancedSquare = enhanceLowLight ? _enhanceLowLight(square) : square;
     final modelImage = img.copyResize(
-      square,
+      enhancedSquare,
       width: modelSize,
       height: modelSize,
       interpolation: img.Interpolation.linear,
     );
     final displayImage = img.copyResize(
-      square,
+      enhancedSquare,
       width: displaySize,
       height: displaySize,
       interpolation: img.Interpolation.linear,
@@ -51,7 +53,28 @@ class ImagePreprocessService {
       modelInput: _toModelInput(modelImage, floatInput: floatInput),
       modelSize: modelSize,
       displaySize: displaySize,
+      enhancementApplied: enhanceLowLight,
     );
+  }
+
+  img.Image _enhanceLowLight(img.Image source) {
+    final enhanced = img.Image.from(source);
+    for (final pixel in enhanced) {
+      final red = _clampChannel(((pixel.r - 128) * 1.06) + 142);
+      final green = _clampChannel(((pixel.g - 128) * 1.06) + 142);
+      final blue = _clampChannel(((pixel.b - 128) * 1.06) + 142);
+      pixel
+        ..r = red
+        ..g = green
+        ..b = blue;
+    }
+    return enhanced;
+  }
+
+  int _clampChannel(num value) {
+    if (value < 0) return 0;
+    if (value > 255) return 255;
+    return value.round();
   }
 
   img.Image _centerCropSquare(img.Image source) {

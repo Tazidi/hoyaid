@@ -8,6 +8,7 @@ import 'package:hoyaid/features/history/models/classification_record.dart';
 import 'package:hoyaid/features/history/providers/history_provider.dart';
 import 'package:hoyaid/features/species/models/hoya_species.dart';
 import 'package:hoyaid/features/species/providers/species_provider.dart';
+import 'package:hoyaid/shared/widgets/interactive.dart';
 import 'package:intl/intl.dart';
 
 class ClassificationDetailScreen extends ConsumerWidget {
@@ -45,7 +46,7 @@ class ClassificationDetailScreen extends ConsumerWidget {
             speciesById: speciesById,
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const _DetailLoadingSkeleton(),
         error: (error, _) => _DetailEmptyState(
           icon: Icons.error_outline,
           title: 'Gagal memuat detail',
@@ -220,72 +221,61 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
-        if (record.imageUrl?.isNotEmpty == true)
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: AspectRatio(
-              aspectRatio: 1,
-              child: Image.network(
-                record.imageUrl!,
-                fit: BoxFit.cover,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return const Center(child: CircularProgressIndicator());
-                },
-                errorBuilder: (context, error, stackTrace) {
-                  return const Card(
-                    child: Center(
-                      child: Icon(Icons.broken_image_outlined, size: 56),
-                    ),
-                  );
-                },
-              ),
-            ),
-          )
-        else
-          const AspectRatio(
-            aspectRatio: 1,
-            child: Card(
-              child: Center(child: Icon(Icons.image_not_supported, size: 56)),
-            ),
-          ),
+        FadeSlideIn(
+          child: _DetailHeroImage(imageUrl: record.imageUrl),
+        ),
         const SizedBox(height: 16),
-        _VerificationBadge(record: record),
-        const SizedBox(height: 12),
-        _InfoCard(
-          title: speciesName,
-          rows: [
-            _InfoRow('Dibuat', createdAt),
-            _InfoRow('Status data', record.status),
-            _InfoRow('Verifikasi', record.verificationLabel),
-            _InfoRow('Confidence', record.confidencePercent),
-            _InfoRow('Bucket', record.confidenceBucket),
-            if (record.oodScore != null)
-              _InfoRow('OOD score', record.oodScore!.toStringAsFixed(2)),
-            _InfoRow('Model', record.modelVersion),
-            _InfoRow('Prediksi model', predictedName),
-            if (correctedName != null) _InfoRow('Koreksi label', correctedName),
-          ],
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 70),
+          child: _VerificationBadge(record: record),
         ),
         const SizedBox(height: 12),
-        _LocationCard(record: record),
-        const SizedBox(height: 12),
-        _PredictionCard(
-          predictions: record.topPredictions,
-          speciesById: widget.speciesById,
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 130),
+          child: _InfoCard(
+            title: speciesName,
+            rows: [
+              _InfoRow('Dibuat', createdAt),
+              _InfoRow('Status data', record.status),
+              _InfoRow('Verifikasi', record.verificationLabel),
+              _InfoRow('Confidence', record.confidencePercent),
+              _InfoRow('Bucket', record.confidenceBucket),
+              if (record.oodScore != null)
+                _InfoRow('OOD score', record.oodScore!.toStringAsFixed(2)),
+              _InfoRow('Model', record.modelVersion),
+              _InfoRow('Prediksi model', predictedName),
+              if (correctedName != null)
+                _InfoRow('Koreksi label', correctedName),
+            ],
+          ),
         ),
         const SizedBox(height: 12),
-        _InfoCard(
-          title: 'Audit',
-          rows: [
-            _InfoRow('ID klasifikasi', record.classificationId),
-            _InfoRow('User ID', record.userId),
-            _InfoRow('Path gambar', record.imageStoragePath ?? '-'),
-            _InfoRow('Date bucket', record.dateBucket ?? '-'),
-            _InfoRow('Ukuran model', record.imageSizeForModel),
-            _InfoRow('Ukuran display', record.imageSizeForDisplay),
-          ],
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 190),
+          child: _LocationCard(record: record),
         ),
+        const SizedBox(height: 12),
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 250),
+          child: _PredictionCard(
+            predictions: record.topPredictions,
+            speciesById: widget.speciesById,
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (isAdmin) ...[
+          _InfoCard(
+            title: 'Audit',
+            rows: [
+              _InfoRow('ID klasifikasi', record.classificationId),
+              _InfoRow('User ID', record.userId),
+              _InfoRow('Path gambar', record.imageStoragePath ?? '-'),
+              _InfoRow('Date bucket', record.dateBucket ?? '-'),
+              _InfoRow('Ukuran model', record.imageSizeForModel),
+              _InfoRow('Ukuran display', record.imageSizeForDisplay),
+            ],
+          ),
+        ],
         if (canMutate) ...[
           const SizedBox(height: 16),
           _ActionPanel(
@@ -298,6 +288,97 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
             onReject: () => _setVerificationStatus('rejected'),
             onUnverify: () => _setVerificationStatus('unverified'),
           ),
+        ],
+      ],
+    );
+  }
+}
+
+/// Gambar utama riwayat dengan sudut membulat besar, shimmer saat loading,
+/// dan fallback rapi bila gambar tidak ada / gagal dimuat.
+class _DetailHeroImage extends StatelessWidget {
+  final String? imageUrl;
+
+  const _DetailHeroImage({required this.imageUrl});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    Widget content;
+    if (imageUrl?.isNotEmpty == true) {
+      content = Image.network(
+        imageUrl!,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return const ShimmerBox(
+            height: double.infinity,
+            borderRadius: BorderRadius.zero,
+          );
+        },
+        errorBuilder: (context, error, stackTrace) => ColoredBox(
+          color: colorScheme.errorContainer,
+          child: Icon(Icons.broken_image_outlined,
+              size: 56, color: colorScheme.onErrorContainer),
+        ),
+      );
+    } else {
+      content = ColoredBox(
+        color: colorScheme.surfaceContainerHighest,
+        child: Icon(Icons.image_not_supported,
+            size: 56, color: colorScheme.onSurfaceVariant),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.14),
+            blurRadius: 22,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: AspectRatio(aspectRatio: 1, child: content),
+      ),
+    );
+  }
+}
+
+/// Skeleton shimmer untuk layar detail riwayat saat memuat.
+class _DetailLoadingSkeleton extends StatelessWidget {
+  const _DetailLoadingSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        const AspectRatio(
+          aspectRatio: 1,
+          child: ShimmerBox(
+            height: double.infinity,
+            borderRadius: BorderRadius.all(Radius.circular(24)),
+          ),
+        ),
+        const SizedBox(height: 16),
+        const ShimmerBox(
+          width: 140,
+          height: 36,
+          borderRadius: BorderRadius.all(Radius.circular(999)),
+        ),
+        const SizedBox(height: 12),
+        for (int i = 0; i < 3; i++) ...[
+          const ShimmerBox(
+            height: 150,
+            borderRadius: BorderRadius.all(Radius.circular(24)),
+          ),
+          const SizedBox(height: 12),
         ],
       ],
     );
@@ -349,7 +430,7 @@ class _VerificationBadge extends StatelessWidget {
         decoration: BoxDecoration(
           color: backgroundColor,
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: foregroundColor.withOpacity(0.24)),
+          border: Border.all(color: foregroundColor.withValues(alpha: 0.24)),
         ),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -476,38 +557,107 @@ class _PredictionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Top Predictions',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            if (predictions.isEmpty)
-              const Text('-')
-            else
-              for (final prediction in predictions)
-                ListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(
-                    speciesById[prediction.speciesId]?.displayName ??
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return SectionCard(
+      icon: Icons.leaderboard_rounded,
+      title: 'Kandidat Teratas',
+      accent: const Color(0xFF0E9F9A),
+      child: predictions.isEmpty
+          ? Text(
+              'Tidak ada data prediksi.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+            )
+          : Column(
+              children: [
+                for (final (index, prediction) in predictions.indexed) ...[
+                  if (index > 0) const SizedBox(height: 14),
+                  _DetailPredictionRow(
+                    rank: index + 1,
+                    name: speciesById[prediction.speciesId]?.displayName ??
                         prediction.speciesId,
+                    confidence: prediction.confidence.clamp(0.0, 1.0).toDouble(),
                   ),
-                  subtitle: LinearProgressIndicator(
-                    value: prediction.confidence.clamp(0.0, 1.0).toDouble(),
-                  ),
-                  trailing: Text(
-                    '${(prediction.confidence * 100).toStringAsFixed(1)}%',
-                  ),
+                ],
+              ],
+            ),
+    );
+  }
+}
+
+class _DetailPredictionRow extends StatelessWidget {
+  final int rank;
+  final String name;
+  final double confidence;
+
+  const _DetailPredictionRow({
+    required this.rank,
+    required this.name,
+    required this.confidence,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final barColor = rank == 1 ? colorScheme.primary : colorScheme.tertiary;
+
+    return Row(
+      children: [
+        Container(
+          width: 26,
+          height: 26,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: barColor.withValues(alpha: 0.14),
+            shape: BoxShape.circle,
+          ),
+          child: Text(
+            '$rank',
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: barColor,
+                  fontWeight: FontWeight.w900,
                 ),
-          ],
+          ),
         ),
-      ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${(confidence * 100).toStringAsFixed(1)}%',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: barColor,
+                        ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              AnimatedProgressBar(
+                value: confidence,
+                color: barColor,
+                height: 8,
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

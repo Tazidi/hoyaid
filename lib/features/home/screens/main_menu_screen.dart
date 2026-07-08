@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hoyaid/features/auth/providers/auth_provider.dart';
+import 'package:hoyaid/features/species/models/hoya_species.dart';
+import 'package:hoyaid/features/species/providers/species_provider.dart';
+import 'package:hoyaid/shared/widgets/interactive.dart';
 
 class MainMenuScreen extends ConsumerWidget {
   const MainMenuScreen({super.key});
@@ -10,28 +13,23 @@ class MainMenuScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
     final userData = ref.watch(userDataProvider).valueOrNull;
+    final speciesAsync = ref.watch(activeSpeciesProvider);
     final isAdmin = userData?['role'] == 'admin';
     final displayName =
         (userData?['displayName'] ?? userData?['name']) as String?;
+
     final menuItems = [
-      _MenuItem(
-        icon: Icons.camera_alt_rounded,
-        label: 'Klasifikasi',
-        subtitle: 'Foto Hoya sekarang',
-        color: colorScheme.primary,
-        onTap: () => context.push('/classification'),
-      ),
       _MenuItem(
         icon: Icons.history_rounded,
         label: 'Riwayat',
-        subtitle: 'Lihat hasil tersimpan',
+        subtitle: 'Hasil klasifikasi Anda',
         color: const Color(0xFF8B6F47),
         onTap: () => context.push('/history'),
       ),
       _MenuItem(
         icon: Icons.map_rounded,
         label: 'Peta Sebaran',
-        subtitle: 'Jelajahi lokasi temuan',
+        subtitle: 'Lihat lokasi temuan',
         color: const Color(0xFF0E9F9A),
         onTap: () => context.push('/map'),
       ),
@@ -46,32 +44,17 @@ class MainMenuScreen extends ConsumerWidget {
         _MenuItem(
           icon: Icons.dashboard_customize_rounded,
           label: 'Dashboard Admin',
-          subtitle: 'Pantau aktivitas aplikasi',
+          subtitle: 'Kelola data aplikasi',
           color: Colors.blueGrey,
           onTap: () => context.push('/admin'),
-        ),
-      if (isAdmin)
-        _MenuItem(
-          icon: Icons.admin_panel_settings_rounded,
-          label: 'Kelola Spesies',
-          subtitle: 'Tambah dan edit data',
-          color: Colors.indigo,
-          onTap: () => context.push('/admin/species'),
-        ),
-      if (isAdmin)
-        _MenuItem(
-          icon: Icons.account_tree_rounded,
-          label: 'Label Map',
-          subtitle: 'Sinkronkan label model',
-          color: Colors.deepPurple,
-          onTap: () => context.push('/admin/label-map'),
         ),
     ];
 
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('HoyaID'),
+        title: const Text('iHoya'),
+        backgroundColor: Colors.transparent,
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12),
@@ -89,25 +72,51 @@ class MainMenuScreen extends ConsumerWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              colorScheme.primary.withValues(alpha: 0.18),
-              Theme.of(context).scaffoldBackgroundColor,
-              colorScheme.secondaryContainer.withValues(alpha: 0.35),
+              colorScheme.primary.withValues(alpha: 0.22),
+              colorScheme.surface,
+              colorScheme.secondaryContainer.withValues(alpha: 0.48),
             ],
           ),
         ),
         child: SafeArea(
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
             children: [
-              _HeroHeader(name: displayName),
+              FadeSlideIn(
+                child: _HomeHero(
+                  name: displayName,
+                  onScan: () => context.push('/classification'),
+                  onMap: () => context.push('/map'),
+                ),
+              ),
               const SizedBox(height: 18),
-              _QuickActionCard(onTap: () => context.push('/classification')),
+              FadeSlideIn(
+                delay: const Duration(milliseconds: 90),
+                child: _InsightStrip(speciesAsync: speciesAsync),
+              ),
+              const SizedBox(height: 22),
+              FadeSlideIn(
+                delay: const Duration(milliseconds: 160),
+                child: _SectionHeader(
+                  title: 'Spesies Pilihan',
+                  actionLabel: 'Lihat semua',
+                  onAction: () => context.push('/species'),
+                ),
+              ),
+              const SizedBox(height: 12),
+              FadeSlideIn(
+                delay: const Duration(milliseconds: 220),
+                child: _SpeciesCarousel(speciesAsync: speciesAsync),
+              ),
               const SizedBox(height: 24),
-              Text(
-                'Pilih aktivitas',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
+              FadeSlideIn(
+                delay: const Duration(milliseconds: 280),
+                child: Text(
+                  'Jelajahi iHoya',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                ),
               ),
               const SizedBox(height: 12),
               LayoutBuilder(
@@ -118,13 +127,15 @@ class MainMenuScreen extends ConsumerWidget {
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: menuItems.length,
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: isWide ? 3 : 2,
+                      crossAxisCount: isWide ? 4 : 2,
                       crossAxisSpacing: 14,
                       mainAxisSpacing: 14,
-                      childAspectRatio: isWide ? 1.18 : 0.9,
+                      childAspectRatio: isWide ? 1.2 : 1.04,
                     ),
-                    itemBuilder: (context, index) =>
-                        _MenuCard(item: menuItems[index]),
+                    itemBuilder: (context, index) => FadeSlideIn(
+                      delay: Duration(milliseconds: 320 + index * 70),
+                      child: _MenuCard(item: menuItems[index]),
+                    ),
                   );
                 },
               ),
@@ -136,137 +147,562 @@ class MainMenuScreen extends ConsumerWidget {
   }
 }
 
-class _HeroHeader extends StatelessWidget {
+class _HomeHero extends StatelessWidget {
   final String? name;
+  final VoidCallback onScan;
+  final VoidCallback onMap;
 
-  const _HeroHeader({required this.name});
+  const _HomeHero({
+    required this.name,
+    required this.onScan,
+    required this.onMap,
+  });
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final greeting = name == null || name!.trim().isEmpty
-        ? 'Halo, Penjelajah Hoya'
+        ? 'Selamat datang'
         : 'Halo, ${name!.trim()}';
 
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(30),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF1B7F5A), Color(0xFF55C28B)],
+        borderRadius: BorderRadius.circular(32),
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
+          colors: [
+            colorScheme.primary,
+            const Color(0xFF1F8A70),
+            colorScheme.tertiary,
+          ],
         ),
         boxShadow: [
           BoxShadow(
-            color: colorScheme.primary.withValues(alpha: 0.22),
-            blurRadius: 28,
-            offset: const Offset(0, 14),
+            color: colorScheme.primary.withValues(alpha: 0.24),
+            blurRadius: 32,
+            offset: const Offset(0, 18),
           ),
         ],
       ),
-      child: Row(
+      child: Stack(
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  greeting,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w900,
-                      ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Identifikasi, simpan, dan jelajahi sebaran spesies Hoya dengan alur yang sederhana.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.88),
-                        height: 1.45,
-                      ),
-                ),
-              ],
+          Positioned(
+            right: -22,
+            top: -28,
+            child: Icon(
+              Icons.eco_rounded,
+              size: 148,
+              color: Colors.white.withValues(alpha: 0.08),
             ),
           ),
-          const SizedBox(width: 14),
-          const _LeafBadge(),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  greeting,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Kenali Hoya dari foto, simpan temuan, dan jelajahi sebarannya.',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      height: 1.12,
+                    ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Gunakan kamera untuk identifikasi cepat atau buka peta untuk melihat persebaran data yang sudah tercatat.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.88),
+                      height: 1.45,
+                    ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: onScan,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: colorScheme.primary,
+                        minimumSize: const Size.fromHeight(52),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                      ),
+                      icon: const Icon(Icons.camera_alt_rounded),
+                      label: const Text('Mulai Scan'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  IconButton.filledTonal(
+                    onPressed: onMap,
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.white.withValues(alpha: 0.16),
+                      foregroundColor: Colors.white,
+                      fixedSize: const Size(52, 52),
+                    ),
+                    icon: const Icon(Icons.map_rounded),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 }
 
-class _LeafBadge extends StatelessWidget {
-  const _LeafBadge();
+class _InsightStrip extends StatelessWidget {
+  final AsyncValue<List<HoyaSpecies>> speciesAsync;
+
+  const _InsightStrip({required this.speciesAsync});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 76,
-      height: 76,
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.18),
-        shape: BoxShape.circle,
+    return speciesAsync.when(
+      data: (species) {
+        final rareCount = species.where((item) => item.isRare).length;
+        final medicalCount = species.where((item) => item.hasMedicalUse).length;
+        return Row(
+          children: [
+            Expanded(
+              child: _InsightCard(
+                icon: Icons.local_florist_rounded,
+                value: species.length,
+                label: 'Spesies aktif',
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _InsightCard(
+                icon: Icons.auto_awesome_rounded,
+                value: rareCount,
+                label: 'Langka',
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _InsightCard(
+                icon: Icons.healing_rounded,
+                value: medicalCount,
+                label: 'Manfaat',
+              ),
+            ),
+          ],
+        );
+      },
+      loading: () => const Row(
+        children: [
+          Expanded(child: _InsightSkeleton()),
+          SizedBox(width: 10),
+          Expanded(child: _InsightSkeleton()),
+          SizedBox(width: 10),
+          Expanded(child: _InsightSkeleton()),
+        ],
       ),
-      child: const Icon(Icons.eco_rounded, color: Colors.white, size: 42),
+      error: (_, __) => const SizedBox.shrink(),
     );
   }
 }
 
-class _QuickActionCard extends StatelessWidget {
-  final VoidCallback onTap;
+class _InsightCard extends StatelessWidget {
+  final IconData icon;
+  final int value;
+  final String label;
 
-  const _QuickActionCard({required this.onTap});
+  const _InsightCard({
+    required this.icon,
+    required this.value,
+    required this.label,
+  });
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Material(
-      color: Colors.white.withValues(alpha: 0.86),
-      borderRadius: BorderRadius.circular(24),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(24),
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: colorScheme.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(18),
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colorScheme.surface.withValues(alpha: 0.86),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: colorScheme.primary, size: 22),
+          const SizedBox(height: 10),
+          AnimatedCountUp(
+            value: value,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w900,
                 ),
-                child:
-                    Icon(Icons.camera_alt_rounded, color: colorScheme.primary),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Mulai klasifikasi cepat',
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleMedium
-                          ?.copyWith(fontWeight: FontWeight.w800),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Ambil foto daun atau bunga dengan panduan otomatis.',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
+          ),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InsightSkeleton extends StatelessWidget {
+  const _InsightSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return const ShimmerBox(
+      height: 98,
+      borderRadius: BorderRadius.all(Radius.circular(22)),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  final String actionLabel;
+  final VoidCallback onAction;
+
+  const _SectionHeader({
+    required this.title,
+    required this.actionLabel,
+    required this.onAction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            title,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w900,
                 ),
-              ),
-              Icon(Icons.arrow_forward_ios_rounded,
-                  size: 18, color: colorScheme.primary),
-            ],
           ),
         ),
+        TextButton(
+          onPressed: onAction,
+          child: Text(actionLabel),
+        ),
+      ],
+    );
+  }
+}
+
+class _SpeciesCarousel extends StatefulWidget {
+  final AsyncValue<List<HoyaSpecies>> speciesAsync;
+
+  const _SpeciesCarousel({required this.speciesAsync});
+
+  @override
+  State<_SpeciesCarousel> createState() => _SpeciesCarouselState();
+}
+
+class _SpeciesCarouselState extends State<_SpeciesCarousel> {
+  final PageController _controller = PageController(viewportFraction: 0.88);
+  double _page = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    final page = _controller.page ?? 0;
+    if (page != _page) setState(() => _page = page);
+  }
+
+  @override
+  void dispose() {
+    _controller.removeListener(_onScroll);
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return widget.speciesAsync.when(
+      data: (species) {
+        final featured = species.take(6).toList();
+        if (featured.isEmpty) return const _EmptySpeciesCard();
+
+        return Column(
+          children: [
+            SizedBox(
+              height: 210,
+              child: PageView.builder(
+                controller: _controller,
+                padEnds: false,
+                itemCount: featured.length,
+                itemBuilder: (context, index) {
+                  // Kartu aktif sedikit lebih besar dari tetangganya.
+                  final distance = (_page - index).abs().clamp(0.0, 1.0);
+                  final scale = 1 - distance * 0.06;
+                  return Padding(
+                    padding: EdgeInsets.only(
+                      right: index == featured.length - 1 ? 0 : 12,
+                    ),
+                    child: Transform.scale(
+                      scale: scale,
+                      child: _SpeciesFeatureCard(species: featured[index]),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
+            _CarouselDots(count: featured.length, page: _page),
+          ],
+        );
+      },
+      loading: () => const SizedBox(
+        height: 210,
+        child: ShimmerBox(
+          height: 210,
+          borderRadius: BorderRadius.all(Radius.circular(28)),
+        ),
+      ),
+      error: (_, __) => const _EmptySpeciesCard(),
+    );
+  }
+}
+
+/// Titik indikator halaman untuk carousel. Titik aktif memanjang.
+class _CarouselDots extends StatelessWidget {
+  final int count;
+  final double page;
+
+  const _CarouselDots({required this.count, required this.page});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final active = page.round();
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        for (int i = 0; i < count; i++)
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOut,
+            margin: const EdgeInsets.symmetric(horizontal: 3),
+            width: i == active ? 22 : 7,
+            height: 7,
+            decoration: BoxDecoration(
+              color: i == active
+                  ? colorScheme.primary
+                  : colorScheme.primary.withValues(alpha: 0.24),
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _SpeciesFeatureCard extends StatelessWidget {
+  final HoyaSpecies species;
+
+  const _SpeciesFeatureCard({required this.species});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final imageUrl = species.referenceImageUrl;
+
+    return PressableScale(
+      borderRadius: BorderRadius.circular(28),
+      child: Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => context.push('/species/${species.speciesId}'),
+        borderRadius: BorderRadius.circular(28),
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(28),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                colorScheme.primary.withValues(alpha: 0.88),
+                const Color(0xFF163B2F),
+              ],
+            ),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(28),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (imageUrl != null)
+                  Image.network(
+                    imageUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const _SpeciesPattern(),
+                  )
+                else
+                  const _SpeciesPattern(),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withValues(alpha: 0.04),
+                        Colors.black.withValues(alpha: 0.74),
+                      ],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 18,
+                  right: 18,
+                  bottom: 18,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          if (species.isRare)
+                            const _SpeciesTag(label: 'Langka'),
+                          if (species.hasMedicalUse)
+                            const _SpeciesTag(label: 'Berpotensi bermanfaat'),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        species.displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                            ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        species.distribution,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Colors.white.withValues(alpha: 0.86),
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      ),
+    );
+  }
+}
+
+class _SpeciesPattern extends StatelessWidget {
+  const _SpeciesPattern();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFF214B3D),
+      child: Stack(
+        children: [
+          Positioned(
+            right: -18,
+            top: -18,
+            child: Icon(
+              Icons.local_florist_rounded,
+              size: 130,
+              color: Colors.white.withValues(alpha: 0.12),
+            ),
+          ),
+          Positioned(
+            left: 22,
+            top: 20,
+            child: Icon(
+              Icons.eco_rounded,
+              size: 54,
+              color: Colors.white.withValues(alpha: 0.16),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SpeciesTag extends StatelessWidget {
+  final String label;
+
+  const _SpeciesTag({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+            ),
+      ),
+    );
+  }
+}
+
+class _EmptySpeciesCard extends StatelessWidget {
+  const _EmptySpeciesCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      height: 210,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: colorScheme.surface.withValues(alpha: 0.82),
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: const Center(
+        child: Text('Data spesies akan tampil di sini setelah tersedia.'),
       ),
     );
   }
@@ -295,7 +731,12 @@ class _MenuCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return PressableScale(
+      borderRadius: BorderRadius.circular(24),
+      child: Card(
+      elevation: 0,
+      color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.9),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       child: InkWell(
         onTap: item.onTap,
         borderRadius: BorderRadius.circular(24),
@@ -315,10 +756,9 @@ class _MenuCard extends StatelessWidget {
               const Spacer(),
               Text(
                 item.label,
-                style: Theme.of(context)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w800),
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
               ),
               const SizedBox(height: 5),
               Text(
@@ -333,6 +773,7 @@ class _MenuCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }

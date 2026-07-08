@@ -6,7 +6,7 @@ import 'package:hoyaid/features/auth/providers/auth_provider.dart';
 import 'package:hoyaid/features/species/models/hoya_species.dart';
 import 'package:hoyaid/features/species/providers/species_provider.dart';
 import 'package:hoyaid/features/species/widgets/species_reference_image.dart';
-import 'package:hoyaid/shared/widgets/loading_widget.dart';
+import 'package:hoyaid/shared/widgets/interactive.dart';
 
 class SpeciesListScreen extends ConsumerStatefulWidget {
   const SpeciesListScreen({super.key});
@@ -105,16 +105,21 @@ class _SpeciesListScreenState extends ConsumerState<SpeciesListScreen> {
                 if (filtered.isEmpty)
                   const _EmptySpeciesState()
                 else
-                  for (final item in filtered)
+                  for (final (index, item) in filtered.indexed)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 10),
-                      child: _SpeciesListItem(species: item),
+                      child: FadeSlideIn(
+                        // Batasi delay agar item paling bawah tak menunggu lama.
+                        delay: Duration(milliseconds: (index * 45).clamp(0, 400)),
+                        offsetY: 16,
+                        child: _SpeciesListItem(species: item),
+                      ),
                     ),
               ],
             ),
           );
         },
-        loading: () => const LoadingWidget(message: 'Memuat spesies...'),
+        loading: () => const _SpeciesLoadingSkeleton(),
         error: (error, stackTrace) => _ErrorState(
           message: 'Gagal memuat data spesies',
           detail: readableErrorMessage(
@@ -161,7 +166,10 @@ class _SpeciesListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return PressableScale(
+      onTap: () => context.push('/species/${species.speciesId}'),
+      pressedScale: 0.97,
+      child: Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => context.push('/species/${species.speciesId}'),
@@ -211,6 +219,45 @@ class _SpeciesListItem extends StatelessWidget {
           ),
         ),
       ),
+      ),
+    );
+  }
+}
+
+/// Placeholder shimmer saat daftar spesies sedang dimuat.
+class _SpeciesLoadingSkeleton extends StatelessWidget {
+  const _SpeciesLoadingSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      children: [
+        const ShimmerBox(height: 52),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 34,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: 5,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (_, __) => const ShimmerBox(
+              width: 64,
+              height: 34,
+              borderRadius: BorderRadius.all(Radius.circular(999)),
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        for (int i = 0; i < 6; i++)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 10),
+            child: ShimmerBox(
+              height: 100,
+              borderRadius: BorderRadius.all(Radius.circular(24)),
+            ),
+          ),
+      ],
     );
   }
 }

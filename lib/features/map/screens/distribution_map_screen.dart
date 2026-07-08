@@ -619,10 +619,10 @@ class _MarkerLegend extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
+    return const Wrap(
       spacing: 8,
       runSpacing: 6,
-      children: const [
+      children: [
         _LegendItem(color: Colors.green, label: 'Terverifikasi Ahli'),
         _LegendItem(color: Colors.orange, label: 'Pending/Unverified'),
       ],

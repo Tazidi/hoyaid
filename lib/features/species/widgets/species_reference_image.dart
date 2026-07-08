@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hoyaid/shared/widgets/interactive.dart';
 
 class SpeciesReferenceImage extends StatelessWidget {
   final String? imageUrl;
@@ -36,14 +37,10 @@ class SpeciesReferenceImage extends StatelessWidget {
         fit: BoxFit.cover,
         loadingBuilder: (context, child, loadingProgress) {
           if (loadingProgress == null) return child;
-          return ColoredBox(
-            color: colorScheme.surfaceContainerHighest,
-            child: const Center(
-              child: SizedBox.square(
-                dimension: 24,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            ),
+          return ShimmerBox(
+            height: height ?? double.infinity,
+            width: width,
+            borderRadius: borderRadius,
           );
         },
         errorBuilder: (context, error, stackTrace) {

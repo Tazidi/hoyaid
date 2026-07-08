@@ -28,7 +28,7 @@ exports.onUserCreated = functions.auth.user().onCreate(async (user) => {
     const config = await readGeneralConfig();
     const userRef = db.collection('users').doc(user.uid);
 
-    const name = user.displayName || 'Pengguna HoyaID';
+    const name = user.displayName || 'Pengguna iHoya';
     const userData = {
       uid: user.uid,
       name,
@@ -475,6 +475,37 @@ exports.updateUserUploadLimit = appCheckedCallable(
     });
 
     return { uid, uploadLimit, trusted };
+  },
+);
+
+exports.updateUserRole = appCheckedCallable(
+  'updateUserRole',
+  async (data, context) => {
+    const adminUid = assertSignedNonGuest(context);
+    await assertAdmin(adminUid);
+    const uid = readString(data, 'uid', true);
+    const role = readString(data, 'role', true);
+
+    if (!['admin', 'user'].includes(role)) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'Role tidak valid.',
+      );
+    }
+
+    if (uid === adminUid && role !== 'admin') {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'Anda tidak dapat menurunkan role admin akun sendiri.',
+      );
+    }
+
+    await db.collection('users').doc(uid).update({
+      role,
+      updatedAt: serverTimestamp(),
+    });
+
+    return { uid, role };
   },
 );
 

@@ -52,6 +52,8 @@ String _firebaseErrorMessage(
       return 'Akses ditolak. Pastikan akun dan hak akses sudah sesuai.';
     case 'unauthenticated':
       return 'Sesi login berakhir. Silakan masuk lagi.';
+    case 'admin-restricted-operation':
+      return 'Login sebagai tamu belum aktif. Admin perlu mengaktifkan Anonymous sign-in di Firebase Authentication.';
     case 'failed-precondition':
       return error.message?.trim().isNotEmpty == true
           ? error.message!.trim()
