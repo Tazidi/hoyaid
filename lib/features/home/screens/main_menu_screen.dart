@@ -279,31 +279,22 @@ class _InsightStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     return speciesAsync.when(
       data: (species) {
-        final rareCount = species.where((item) => item.isRare).length;
         final medicalCount = species.where((item) => item.hasMedicalUse).length;
         return Row(
           children: [
             Expanded(
               child: _InsightCard(
-                icon: Icons.local_florist_rounded,
+                icon: Icons.grass_rounded,
                 value: species.length,
-                label: 'Spesies aktif',
+                label: 'Spesies terdaftar',
               ),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: _InsightCard(
-                icon: Icons.auto_awesome_rounded,
-                value: rareCount,
-                label: 'Langka',
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _InsightCard(
-                icon: Icons.healing_rounded,
+                icon: Icons.medical_services_rounded,
                 value: medicalCount,
-                label: 'Manfaat',
+                label: 'Manfaat medis',
               ),
             ),
           ],
