@@ -1,13 +1,12 @@
-// Widget smoke test untuk HoyaID.
-// Test lengkap akan ditambahkan di Batch 12.
-
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hoyaid/core/theme/app_theme.dart';
 
 void main() {
-  testWidgets('Placeholder test — implementasi penuh di Batch 12',
-      (WidgetTester tester) async {
-    // TODO Batch 12: tambah test lengkap setelah Firebase terintegrasi.
-    // Test Firebase perlu mock / emulator, tidak bisa dijalankan langsung.
-    expect(true, isTrue);
+  test('tema memakai tipografi global yang terbaca', () {
+    for (final theme in [AppTheme.lightTheme, AppTheme.darkTheme]) {
+      expect(theme.textTheme.bodyMedium?.fontFamily, 'Roboto');
+      expect(theme.textTheme.bodyMedium?.height, 1.5);
+      expect(theme.textTheme.titleLarge?.fontWeight?.value, 700);
+    }
   });
 }

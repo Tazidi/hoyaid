@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:hoyaid/core/utils/error_messages.dart';
 import 'package:hoyaid/features/classification/models/classification_models.dart';
 import 'package:hoyaid/features/classification/services/classification_service.dart';
 import 'package:path_provider/path_provider.dart';
@@ -61,15 +63,46 @@ class OfflineClassificationQueueService {
         .toList();
   }
 
-  Future<int> syncPending() async {
-    if (_isSyncing || !await _isOnline()) return 0;
+  Future<OfflineSyncResult> syncPending() async {
+    if (_isSyncing) {
+      return const OfflineSyncResult(message: 'Sinkronisasi sedang berjalan.');
+    }
+    if (!await _isOnline()) {
+      return const OfflineSyncResult(message: 'Tidak ada koneksi internet.');
+    }
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || user.isAnonymous) {
+      return const OfflineSyncResult(
+        message:
+            'Silakan login dengan akun yang menyimpan data ini sebelum sinkronisasi.',
+      );
+    }
+    try {
+      await user.getIdToken(true);
+    } catch (error) {
+      return OfflineSyncResult(
+        message: readableErrorMessage(
+          error,
+          fallback: 'Sesi login tidak dapat diperbarui. Silakan login kembali.',
+        ),
+      );
+    }
     _isSyncing = true;
     var synced = 0;
+    String? failureMessage;
     try {
       var items = await pendingItems();
       for (final item in items) {
+        if (item.userId != user.uid) {
+          failureMessage =
+              'Data ini dibuat oleh akun lain. Login dengan akun asal untuk menguploadnya.';
+          break;
+        }
         final imageFile = File(item.imagePath);
-        if (!await imageFile.exists()) continue;
+        if (!await imageFile.exists()) {
+          failureMessage = 'Foto lokal untuk salah satu data tidak ditemukan.';
+          break;
+        }
         try {
           await _classificationService.saveClassification(
             prediction: item.prediction,
@@ -86,14 +119,32 @@ class OfflineClassificationQueueService {
               .toList(growable: false);
           await _saveItems(items);
           synced++;
-        } catch (_) {
+        } on ClassificationSaveException catch (error) {
+          failureMessage = _syncErrorMessage(error.cause);
+          break;
+        } catch (error) {
+          failureMessage = _syncErrorMessage(error);
           break;
         }
       }
-      return synced;
+      return OfflineSyncResult(
+        synced: synced,
+        pending: items.length,
+        message: failureMessage,
+      );
     } finally {
       _isSyncing = false;
     }
+  }
+
+  String _syncErrorMessage(Object error) {
+    if (error.toString().toLowerCase().contains('unauthenticated')) {
+      return 'Server menolak sesi aplikasi. Di emulator, daftarkan debug token Firebase App Check lalu coba sinkronisasi lagi.';
+    }
+    return readableErrorMessage(
+      error,
+      fallback: 'Upload data offline gagal. Coba lagi beberapa saat lagi.',
+    );
   }
 
   StreamSubscription<List<ConnectivityResult>> startAutoSync() {
@@ -123,6 +174,18 @@ class OfflineClassificationQueueService {
       jsonEncode(items.map((item) => item.toMap()).toList()),
     );
   }
+}
+
+class OfflineSyncResult {
+  final int synced;
+  final int pending;
+  final String? message;
+
+  const OfflineSyncResult({
+    this.synced = 0,
+    this.pending = 0,
+    this.message,
+  });
 }
 
 enum OfflineClassificationStatus { pendingUpload, synced }

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:hoyaid/core/utils/error_messages.dart';
 import 'package:hoyaid/features/admin/providers/admin_provider.dart';
 import 'package:hoyaid/features/auth/providers/auth_provider.dart';
@@ -101,54 +100,49 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
   }
 
   Future<void> _deleteRecord() async {
-    final reasonController = TextEditingController();
-    bool? confirmed;
-    try {
-      confirmed = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Hapus & Arsipkan'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Gambar akan dihapus dari Storage, metadata dipindahkan ke arsip, dan kuota aktif dikurangi.',
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: reasonController,
-                decoration: const InputDecoration(
-                  labelText: 'Alasan',
-                  hintText: 'Opsional',
-                ),
-                maxLines: 2,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Batal'),
+    var reason = '';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Hapus & Arsipkan'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Gambar akan dihapus dari Storage, metadata dipindahkan ke arsip, dan kuota aktif dikurangi.',
             ),
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              style: FilledButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.error,
+            const SizedBox(height: 12),
+            TextField(
+              onChanged: (value) => reason = value,
+              decoration: const InputDecoration(
+                labelText: 'Alasan',
+                hintText: 'Opsional',
               ),
-              child: const Text('Hapus'),
+              maxLines: 2,
             ),
           ],
         ),
-      );
-    } finally {
-      if (confirmed != true) {
-        reasonController.dispose();
-      }
-    }
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
 
     if (confirmed != true) return;
-    final reason = reasonController.text.trim();
-    reasonController.dispose();
+    if (!mounted) return;
+    reason = reason.trim();
+    final navigator = Navigator.of(context);
+    final route = ModalRoute.of(context);
 
     await _runAction(
       successMessage: 'Data sudah diarsipkan dan dihapus.',
@@ -158,7 +152,7 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
                 reason: reason.isEmpty ? null : reason,
               ),
       onSuccess: () {
-        if (mounted) context.pop();
+        if (route?.isCurrent ?? false) navigator.pop();
       },
     );
   }
@@ -179,17 +173,18 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
     VoidCallback? onSuccess,
   }) async {
     if (_isWorking) return;
+    final messenger = ScaffoldMessenger.of(context);
     setState(() => _isWorking = true);
     try {
       await action();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      onSuccess?.call();
+      if (!messenger.mounted) return;
+      messenger.showSnackBar(
         SnackBar(content: Text(successMessage)),
       );
-      onSuccess?.call();
     } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+      if (messenger.mounted) {
+        messenger.showSnackBar(
           SnackBar(content: Text(readableErrorMessage(error))),
         );
       }
@@ -578,7 +573,8 @@ class _PredictionCard extends StatelessWidget {
                     rank: index + 1,
                     name: speciesById[prediction.speciesId]?.displayName ??
                         prediction.speciesId,
-                    confidence: prediction.confidence.clamp(0.0, 1.0).toDouble(),
+                    confidence:
+                        prediction.confidence.clamp(0.0, 1.0).toDouble(),
                   ),
                 ],
               ],

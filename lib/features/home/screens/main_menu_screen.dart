@@ -85,46 +85,29 @@ class MainMenuScreen extends ConsumerWidget {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
             children: [
-              FadeSlideIn(
-                child: _HomeHero(
-                  name: displayName,
-                  onScan: () => context.push('/classification'),
-                  onMap: () => context.push('/map'),
-                ),
+              _HomeHero(
+                name: displayName,
+                onScan: () => context.push('/classification'),
+                onMap: () => context.push('/map'),
               ),
               const SizedBox(height: 18),
-              FadeSlideIn(
-                delay: const Duration(milliseconds: 90),
-                child: _InsightStrip(speciesAsync: speciesAsync),
-              ),
+              _InsightStrip(speciesAsync: speciesAsync),
               const SizedBox(height: 16),
-              const FadeSlideIn(
-                delay: Duration(milliseconds: 120),
-                child: _OfflinePendingCard(),
-              ),
+              const _OfflinePendingCard(),
               const SizedBox(height: 22),
-              FadeSlideIn(
-                delay: const Duration(milliseconds: 160),
-                child: _SectionHeader(
-                  title: 'Spesies Pilihan',
-                  actionLabel: 'Lihat semua',
-                  onAction: () => context.push('/species'),
-                ),
+              _SectionHeader(
+                title: 'Spesies Pilihan',
+                actionLabel: 'Lihat semua',
+                onAction: () => context.push('/species'),
               ),
               const SizedBox(height: 12),
-              FadeSlideIn(
-                delay: const Duration(milliseconds: 220),
-                child: _SpeciesCarousel(speciesAsync: speciesAsync),
-              ),
+              _SpeciesCarousel(speciesAsync: speciesAsync),
               const SizedBox(height: 24),
-              FadeSlideIn(
-                delay: const Duration(milliseconds: 280),
-                child: Text(
-                  'Jelajahi iHoya',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                ),
+              Text(
+                'Jelajahi iHoya',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
               ),
               const SizedBox(height: 12),
               LayoutBuilder(
@@ -140,10 +123,8 @@ class MainMenuScreen extends ConsumerWidget {
                       mainAxisSpacing: 14,
                       childAspectRatio: isWide ? 1.2 : 1.04,
                     ),
-                    itemBuilder: (context, index) => FadeSlideIn(
-                      delay: Duration(milliseconds: 320 + index * 70),
-                      child: _MenuCard(item: menuItems[index]),
-                    ),
+                    itemBuilder: (context, index) =>
+                        _MenuCard(item: menuItems[index]),
                   );
                 },
               ),
@@ -247,7 +228,7 @@ class _OfflinePendingCardState extends ConsumerState<_OfflinePendingCard> {
 
   Future<void> _syncNow() async {
     setState(() => _isSyncing = true);
-    final synced =
+    final result =
         await ref.read(offlineClassificationQueueServiceProvider).syncPending();
     ref.invalidate(pendingOfflineClassificationsProvider);
     if (!mounted) return;
@@ -255,9 +236,9 @@ class _OfflinePendingCardState extends ConsumerState<_OfflinePendingCard> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          synced == 0
-              ? 'Belum ada data yang tersinkron. Pastikan internet aktif.'
-              : '$synced data offline berhasil disinkronkan.',
+          result.synced > 0
+              ? '${result.synced} data offline berhasil disinkronkan.'
+              : result.message ?? 'Belum ada data yang perlu disinkronkan.',
         ),
       ),
     );

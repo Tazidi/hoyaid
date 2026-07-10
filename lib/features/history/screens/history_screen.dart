@@ -1,8 +1,12 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hoyaid/core/utils/error_messages.dart';
 import 'package:hoyaid/features/auth/providers/auth_provider.dart';
+import 'package:hoyaid/features/classification/providers/classification_provider.dart';
+import 'package:hoyaid/features/classification/services/offline_classification_queue_service.dart';
 import 'package:hoyaid/features/history/models/classification_record.dart';
 import 'package:hoyaid/features/history/providers/history_provider.dart';
 import 'package:hoyaid/features/species/models/hoya_species.dart';
@@ -60,6 +64,8 @@ class _HistoryListTab extends ConsumerStatefulWidget {
 }
 
 class _HistoryListTabState extends ConsumerState<_HistoryListTab> {
+  bool _isSyncingOffline = false;
+
   AutoDisposeStateNotifierProvider<HistoryController,
       AsyncValue<HistoryListState>> get _provider {
     return widget.scope == ClassificationScope.mine
@@ -86,6 +92,9 @@ class _HistoryListTabState extends ConsumerState<_HistoryListTab> {
     };
     final state = ref.watch(_provider);
     final controller = ref.read(_provider.notifier);
+    final offlineItems = widget.scope == ClassificationScope.mine
+        ? ref.watch(pendingOfflineClassificationsProvider).valueOrNull ?? []
+        : const <OfflineClassificationItem>[];
 
     if (widget.scope == ClassificationScope.mine &&
         (user == null || user.isAnonymous)) {
@@ -103,7 +112,10 @@ class _HistoryListTabState extends ConsumerState<_HistoryListTab> {
     return state.when(
       data: (data) {
         return RefreshIndicator(
-          onRefresh: controller.refresh,
+          onRefresh: () async {
+            await controller.refresh();
+            ref.invalidate(pendingOfflineClassificationsProvider);
+          },
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -116,7 +128,24 @@ class _HistoryListTabState extends ConsumerState<_HistoryListTab> {
                 onClear: controller.clearFilters,
               ),
               const SizedBox(height: 12),
-              if (data.items.isEmpty)
+              if (offlineItems.isNotEmpty) ...[
+                _OfflineHistoryHeader(
+                  count: offlineItems.length,
+                  isSyncing: _isSyncingOffline,
+                  onSync: _syncOffline,
+                ),
+                const SizedBox(height: 10),
+                for (final (index, item) in offlineItems.indexed) ...[
+                  FadeSlideIn(
+                    delay: Duration(milliseconds: (index * 40).clamp(0, 320)),
+                    offsetY: 16,
+                    child: _OfflineClassificationCard(item: item),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                const Divider(height: 28),
+              ],
+              if (data.items.isEmpty && offlineItems.isEmpty)
                 const _EmptyState(
                   icon: Icons.history_toggle_off,
                   title: 'Belum ada data',
@@ -163,6 +192,181 @@ class _HistoryListTabState extends ConsumerState<_HistoryListTab> {
           fallback: 'Gagal memuat riwayat. Periksa koneksi lalu coba lagi.',
         ),
         onRetry: controller.refresh,
+      ),
+    );
+  }
+
+  Future<void> _syncOffline() async {
+    if (_isSyncingOffline) return;
+    setState(() => _isSyncingOffline = true);
+    final result =
+        await ref.read(offlineClassificationQueueServiceProvider).syncPending();
+    ref.invalidate(pendingOfflineClassificationsProvider);
+    if (!mounted) return;
+    setState(() => _isSyncingOffline = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          result.synced > 0
+              ? '${result.synced} data offline berhasil disinkronkan.'
+              : result.message ?? 'Belum ada data yang perlu disinkronkan.',
+        ),
+      ),
+    );
+  }
+}
+
+class _OfflineHistoryHeader extends StatelessWidget {
+  final int count;
+  final bool isSyncing;
+  final VoidCallback onSync;
+
+  const _OfflineHistoryHeader({
+    required this.count,
+    required this.isSyncing,
+    required this.onSync,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colorScheme.tertiaryContainer,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.cloud_upload_outlined,
+              color: colorScheme.onTertiaryContainer),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '$count data tersimpan di perangkat',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: colorScheme.onTertiaryContainer,
+                    fontWeight: FontWeight.w900,
+                  ),
+            ),
+          ),
+          IconButton.filledTonal(
+            tooltip: 'Sinkronkan sekarang',
+            onPressed: isSyncing ? null : onSync,
+            icon: isSyncing
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.sync_rounded),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OfflineClassificationCard extends StatelessWidget {
+  final OfflineClassificationItem item;
+
+  const _OfflineClassificationCard({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final location = item.location;
+    final locationText = location == null
+        ? 'Koordinat belum tersedia'
+        : '${location.latitude.toStringAsFixed(5)}, ${location.longitude.toStringAsFixed(5)}';
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      elevation: 0,
+      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 104,
+            height: 132,
+            child: Image.file(
+              File(item.imagePath),
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => ColoredBox(
+                color: colorScheme.surfaceContainerHighest,
+                child: const Icon(Icons.image_not_supported_outlined),
+              ),
+            ),
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item.prediction.speciesId,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              Theme.of(context).textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const _OfflineStatusChip(),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Confidence ${(item.prediction.confidence * 100).toStringAsFixed(1)}%',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    locationText,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    DateFormat('dd MMM yyyy, HH:mm').format(item.createdAt),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OfflineStatusChip extends StatelessWidget {
+  const _OfflineStatusChip();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.orange.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: const Text(
+        'Pending',
+        style: TextStyle(
+          color: Colors.deepOrange,
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
+        ),
       ),
     );
   }
@@ -467,79 +671,80 @@ class _ClassificationCard extends StatelessWidget {
     return PressableScale(
       pressedScale: 0.97,
       child: Card(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: SizedBox.square(
-                  dimension: 86,
-                  child: imageUrl == null || imageUrl.isEmpty
-                      ? ColoredBox(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .surfaceContainerHighest,
-                          child: const Icon(Icons.image_not_supported),
-                        )
-                      : _NetworkThumbnail(imageUrl: imageUrl),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: SizedBox.square(
+                    dimension: 86,
+                    child: imageUrl == null || imageUrl.isEmpty
+                        ? ColoredBox(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest,
+                            child: const Icon(Icons.image_not_supported),
+                          )
+                        : _NetworkThumbnail(imageUrl: imageUrl),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      species?.displayName ?? record.speciesId,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        species?.displayName ?? record.speciesId,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        date,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _StatusChip(
+                            icon: Icons.speed_outlined,
+                            text: record.confidencePercent,
                           ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      date,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _StatusChip(
-                          icon: Icons.speed_outlined,
-                          text: record.confidencePercent,
-                        ),
-                        _VerificationChip(status: record.verificationStatus),
-                        if (record.hasCorrection)
-                          const _StatusChip(
-                            icon: Icons.edit_note_outlined,
-                            text: 'Dikoreksi',
+                          _VerificationChip(status: record.verificationStatus),
+                          if (record.hasCorrection)
+                            const _StatusChip(
+                              icon: Icons.edit_note_outlined,
+                              text: 'Dikoreksi',
+                            ),
+                          _StatusChip(
+                            icon: record.hasLocation
+                                ? Icons.place_outlined
+                                : Icons.location_off_outlined,
+                            text: record.hasLocation
+                                ? 'Ada lokasi'
+                                : 'Tanpa lokasi',
                           ),
-                        _StatusChip(
-                          icon: record.hasLocation
-                              ? Icons.place_outlined
-                              : Icons.location_off_outlined,
-                          text: record.hasLocation
-                              ? 'Ada lokasi'
-                              : 'Tanpa lokasi',
-                        ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const Icon(Icons.chevron_right),
-            ],
+                const Icon(Icons.chevron_right),
+              ],
+            ),
           ),
         ),
-      ),
       ),
     );
   }
