@@ -206,6 +206,10 @@ class _ClassificationResultScreenState
       );
       if (mounted) context.go('/home');
     } on ClassificationSaveException catch (error) {
+      if (!error.hasPendingDocument) {
+        await _saveOffline(draft, user.uid);
+        return;
+      }
       final message = readableErrorMessage(error.cause);
       if (mounted) {
         setState(() {
@@ -240,6 +244,45 @@ class _ClassificationResultScreenState
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
+  }
+
+  Future<void> _saveOffline(
+    ClassificationDraft draft,
+    String userId,
+  ) async {
+    final item =
+        await ref.read(offlineClassificationQueueServiceProvider).enqueue(
+              userId: userId,
+              prediction: draft.prediction,
+              displayJpegBytes: draft.displayJpegBytes,
+              displayImageSize: draft.displayImageSize,
+              modelImageSize: draft.modelImageSize,
+              location: _location,
+            );
+    ref.invalidate(pendingOfflineClassificationsProvider);
+    await _cleanupSourceIfCache(draft.sourceImagePath);
+    if (!mounted) return;
+    setState(() {
+      _saveFailureMessage = null;
+      _pendingClassificationId = item.id;
+      _failedSaveStage = null;
+    });
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Tersimpan Offline'),
+        content: const Text(
+          'Data klasifikasi disimpan di perangkat dan akan otomatis diupload saat internet kembali.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+    if (mounted) context.go('/home');
   }
 
   Future<bool?> _confirmOodSave() {
@@ -534,7 +577,8 @@ class _PredictionHeader extends StatelessWidget {
                     Text(
                       'Prediksi teratas',
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 0.5,
                           ),
@@ -730,8 +774,7 @@ class _SpeciesInfoPanel extends StatelessWidget {
             const SizedBox(height: 14),
             const _MiniLabel(icon: Icons.public_rounded, text: 'Persebaran'),
             const SizedBox(height: 4),
-            Text(distribution!,
-                style: Theme.of(context).textTheme.bodyMedium),
+            Text(distribution!, style: Theme.of(context).textTheme.bodyMedium),
           ],
           if (medicalUse?.isNotEmpty == true) ...[
             const SizedBox(height: 14),

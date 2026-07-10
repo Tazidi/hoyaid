@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hoyaid/features/auth/providers/auth_provider.dart';
+import 'package:hoyaid/features/classification/providers/classification_provider.dart';
+import 'package:hoyaid/features/classification/services/offline_classification_queue_service.dart';
 import 'package:hoyaid/features/species/models/hoya_species.dart';
 import 'package:hoyaid/features/species/providers/species_provider.dart';
 import 'package:hoyaid/shared/widgets/interactive.dart';
+import 'package:intl/intl.dart';
 
 class MainMenuScreen extends ConsumerWidget {
   const MainMenuScreen({super.key});
@@ -94,6 +97,11 @@ class MainMenuScreen extends ConsumerWidget {
                 delay: const Duration(milliseconds: 90),
                 child: _InsightStrip(speciesAsync: speciesAsync),
               ),
+              const SizedBox(height: 16),
+              const FadeSlideIn(
+                delay: Duration(milliseconds: 120),
+                child: _OfflinePendingCard(),
+              ),
               const SizedBox(height: 22),
               FadeSlideIn(
                 delay: const Duration(milliseconds: 160),
@@ -140,6 +148,197 @@ class MainMenuScreen extends ConsumerWidget {
                 },
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OfflinePendingCard extends ConsumerStatefulWidget {
+  const _OfflinePendingCard();
+
+  @override
+  ConsumerState<_OfflinePendingCard> createState() =>
+      _OfflinePendingCardState();
+}
+
+class _OfflinePendingCardState extends ConsumerState<_OfflinePendingCard> {
+  bool _isSyncing = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final pendingAsync = ref.watch(pendingOfflineClassificationsProvider);
+    return pendingAsync.when(
+      data: (items) {
+        if (items.isEmpty) return const SizedBox.shrink();
+        final colorScheme = Theme.of(context).colorScheme;
+        final shownItems = items.take(3).toList();
+
+        return Card(
+          elevation: 0,
+          color: colorScheme.tertiaryContainer.withValues(alpha: 0.86),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.cloud_upload_outlined,
+                      color: colorScheme.onTertiaryContainer,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        '${items.length} data menunggu upload',
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  color: colorScheme.onTertiaryContainer,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                      ),
+                    ),
+                    FilledButton.tonalIcon(
+                      onPressed: _isSyncing ? null : _syncNow,
+                      icon: _isSyncing
+                          ? const SizedBox.square(
+                              dimension: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.sync_rounded),
+                      label: Text(_isSyncing ? 'Sync...' : 'Sync'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Status: pending_upload. Data tersimpan di perangkat dan otomatis diupload saat internet tersedia.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onTertiaryContainer,
+                      ),
+                ),
+                const SizedBox(height: 12),
+                ...shownItems.map((item) => _OfflinePendingTile(item: item)),
+                if (items.length > shownItems.length)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      '+${items.length - shownItems.length} data lainnya',
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                            color: colorScheme.onTertiaryContainer,
+                            fontWeight: FontWeight.w800,
+                          ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+
+  Future<void> _syncNow() async {
+    setState(() => _isSyncing = true);
+    final synced =
+        await ref.read(offlineClassificationQueueServiceProvider).syncPending();
+    ref.invalidate(pendingOfflineClassificationsProvider);
+    if (!mounted) return;
+    setState(() => _isSyncing = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          synced == 0
+              ? 'Belum ada data yang tersinkron. Pastikan internet aktif.'
+              : '$synced data offline berhasil disinkronkan.',
+        ),
+      ),
+    );
+  }
+}
+
+class _OfflinePendingTile extends StatelessWidget {
+  final OfflineClassificationItem item;
+
+  const _OfflinePendingTile({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final location = item.location;
+    final locationText = location == null
+        ? 'Koordinat belum tersedia'
+        : '${location.latitude.toStringAsFixed(5)}, ${location.longitude.toStringAsFixed(5)}';
+
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colorScheme.surface.withValues(alpha: 0.58),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.schedule_rounded, color: colorScheme.onTertiaryContainer),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.prediction.speciesId,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: colorScheme.onTertiaryContainer,
+                        fontWeight: FontWeight.w900,
+                      ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$locationText • ${DateFormat('dd MMM HH:mm').format(item.createdAt)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onTertiaryContainer,
+                      ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          const _PendingBadge(),
+        ],
+      ),
+    );
+  }
+}
+
+class _PendingBadge extends StatelessWidget {
+  const _PendingBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.orange.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+        child: Text(
+          'pending',
+          style: TextStyle(
+            color: Colors.deepOrange,
+            fontSize: 11,
+            fontWeight: FontWeight.w900,
           ),
         ),
       ),
@@ -531,91 +730,93 @@ class _SpeciesFeatureCard extends StatelessWidget {
     return PressableScale(
       borderRadius: BorderRadius.circular(28),
       child: Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => context.push('/species/${species.speciesId}'),
-        borderRadius: BorderRadius.circular(28),
-        child: Ink(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(28),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                colorScheme.primary.withValues(alpha: 0.88),
-                const Color(0xFF163B2F),
-              ],
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => context.push('/species/${species.speciesId}'),
+          borderRadius: BorderRadius.circular(28),
+          child: Ink(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(28),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  colorScheme.primary.withValues(alpha: 0.88),
+                  const Color(0xFF163B2F),
+                ],
+              ),
             ),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(28),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                if (imageUrl != null)
-                  Image.network(
-                    imageUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const _SpeciesPattern(),
-                  )
-                else
-                  const _SpeciesPattern(),
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.black.withValues(alpha: 0.04),
-                        Colors.black.withValues(alpha: 0.74),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(28),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (imageUrl != null)
+                    Image.network(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const _SpeciesPattern(),
+                    )
+                  else
+                    const _SpeciesPattern(),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.04),
+                          Colors.black.withValues(alpha: 0.74),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 18,
+                    right: 18,
+                    bottom: 18,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            if (species.isRare)
+                              const _SpeciesTag(label: 'Langka'),
+                            if (species.hasMedicalUse)
+                              const _SpeciesTag(label: 'Berpotensi bermanfaat'),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          species.displayName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              Theme.of(context).textTheme.titleLarge?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          species.distribution,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: Colors.white.withValues(alpha: 0.86),
+                                  ),
+                        ),
                       ],
                     ),
                   ),
-                ),
-                Positioned(
-                  left: 18,
-                  right: 18,
-                  bottom: 18,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          if (species.isRare)
-                            const _SpeciesTag(label: 'Langka'),
-                          if (species.hasMedicalUse)
-                            const _SpeciesTag(label: 'Berpotensi bermanfaat'),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        species.displayName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w900,
-                            ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        species.distribution,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Colors.white.withValues(alpha: 0.86),
-                            ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
-      ),
       ),
     );
   }
@@ -725,46 +926,46 @@ class _MenuCard extends StatelessWidget {
     return PressableScale(
       borderRadius: BorderRadius.circular(24),
       child: Card(
-      elevation: 0,
-      color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.9),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      child: InkWell(
-        onTap: item.onTap,
-        borderRadius: BorderRadius.circular(24),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(13),
-                decoration: BoxDecoration(
-                  color: item.color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(18),
+        elevation: 0,
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.9),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: InkWell(
+          onTap: item.onTap,
+          borderRadius: BorderRadius.circular(24),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(13),
+                  decoration: BoxDecoration(
+                    color: item.color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Icon(item.icon, size: 30, color: item.color),
                 ),
-                child: Icon(item.icon, size: 30, color: item.color),
-              ),
-              const Spacer(),
-              Text(
-                item.label,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w900,
-                    ),
-              ),
-              const SizedBox(height: 5),
-              Text(
-                item.subtitle,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(height: 1.3),
-              ),
-            ],
+                const Spacer(),
+                Text(
+                  item.label,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  item.subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(height: 1.3),
+                ),
+              ],
+            ),
           ),
         ),
-      ),
       ),
     );
   }

@@ -8,6 +8,7 @@ import 'package:hoyaid/features/classification/services/image_quality_service.da
 import 'package:hoyaid/features/classification/services/label_map_service.dart';
 import 'package:hoyaid/features/classification/services/location_service.dart';
 import 'package:hoyaid/features/classification/services/ood_service.dart';
+import 'package:hoyaid/features/classification/services/offline_classification_queue_service.dart';
 import 'package:hoyaid/features/classification/services/plant_filter_service.dart';
 import 'package:hoyaid/features/classification/services/tflite_service.dart';
 
@@ -67,4 +68,16 @@ final classificationPipelineServiceProvider =
 
 final classificationServiceProvider = Provider<ClassificationService>((ref) {
   return ClassificationService();
+});
+
+final offlineClassificationQueueServiceProvider =
+    Provider<OfflineClassificationQueueService>((ref) {
+  return OfflineClassificationQueueService(
+    classificationService: ref.watch(classificationServiceProvider),
+  );
+});
+
+final pendingOfflineClassificationsProvider =
+    FutureProvider<List<OfflineClassificationItem>>((ref) {
+  return ref.watch(offlineClassificationQueueServiceProvider).pendingItems();
 });

@@ -8,7 +8,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hoyaid/core/router/app_router.dart';
 import 'package:hoyaid/core/theme/app_theme.dart';
+import 'package:hoyaid/features/classification/providers/classification_provider.dart';
+import 'package:hoyaid/features/classification/services/offline_sync_reminder_service.dart';
 import 'package:hoyaid/firebase_options.dart';
+import 'package:workmanager/workmanager.dart';
+
+@pragma('vm:entry-point')
+void offlineSyncReminderCallback() {
+  Workmanager().executeTask((task, inputData) async {
+    await OfflineSyncReminderService.showIfNeeded();
+    return true;
+  });
+}
 
 void main() async {
   runZonedGuarded(() async {
@@ -21,6 +32,16 @@ void main() async {
 
     FirebaseFirestore.instance.settings = const Settings(
       persistenceEnabled: true,
+    );
+
+    await OfflineSyncReminderService.requestPermission();
+    await Workmanager().initialize(offlineSyncReminderCallback);
+    await Workmanager().registerPeriodicTask(
+      OfflineSyncReminderService.taskName,
+      OfflineSyncReminderService.taskName,
+      constraints: Constraints(networkType: NetworkType.connected),
+      frequency: const Duration(minutes: 15),
+      existingWorkPolicy: ExistingPeriodicWorkPolicy.keep,
     );
 
     // 2. Init App Check (debug provider untuk development)
@@ -46,11 +67,31 @@ void main() async {
   });
 }
 
-class HoyaApp extends ConsumerWidget {
+class HoyaApp extends ConsumerStatefulWidget {
   const HoyaApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HoyaApp> createState() => _HoyaAppState();
+}
+
+class _HoyaAppState extends ConsumerState<HoyaApp> {
+  StreamSubscription? _syncSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncSubscription =
+        ref.read(offlineClassificationQueueServiceProvider).startAutoSync();
+  }
+
+  @override
+  void dispose() {
+    _syncSubscription?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final router = ref.watch(appRouterProvider);
 
     return MaterialApp.router(

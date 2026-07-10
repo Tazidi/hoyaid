@@ -49,7 +49,12 @@ dependencies:
   # Icons
   cupertino_icons: ^1.0.8
   cached_network_image: ^3.4.1
+  connectivity_plus: ^6.1.0
+  flutter_local_notifications: ^17.2.4
+  path_provider: ^2.1.5
   rxdart: ^0.28.0
+  shared_preferences: ^2.3.2
+  workmanager: ^0.9.0+3
 
 dev_dependencies:
   flutter_test:

@@ -18,6 +18,14 @@ class TopPrediction {
       'confidence': confidence,
     };
   }
+
+  factory TopPrediction.fromMap(Map<String, dynamic> data) {
+    return TopPrediction(
+      labelIndex: (data['labelIndex'] as num).toInt(),
+      speciesId: data['speciesId'].toString(),
+      confidence: (data['confidence'] as num).toDouble(),
+    );
+  }
 }
 
 enum OodLevel {
@@ -42,6 +50,31 @@ class OodEvaluation {
     required this.isLikelyOod,
     required this.level,
   });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'score': score,
+      'entropy': entropy,
+      'topMargin': topMargin,
+      'isLowConfidence': isLowConfidence,
+      'isLikelyOod': isLikelyOod,
+      'level': level.name,
+    };
+  }
+
+  factory OodEvaluation.fromMap(Map<String, dynamic> data) {
+    return OodEvaluation(
+      score: (data['score'] as num).toDouble(),
+      entropy: (data['entropy'] as num).toDouble(),
+      topMargin: (data['topMargin'] as num).toDouble(),
+      isLowConfidence: data['isLowConfidence'] == true,
+      isLikelyOod: data['isLikelyOod'] == true,
+      level: OodLevel.values.firstWhere(
+        (level) => level.name == data['level'],
+        orElse: () => OodLevel.uncertain,
+      ),
+    );
+  }
 }
 
 class ClassificationPrediction {
@@ -60,6 +93,26 @@ class ClassificationPrediction {
   TopPrediction get topPrediction => topPredictions.first;
   String get speciesId => topPrediction.speciesId;
   double get confidence => topPrediction.confidence;
+
+  Map<String, dynamic> toMap() {
+    return {
+      'modelVersion': modelVersion,
+      'outputCount': outputCount,
+      'topPredictions': topPredictions.map((item) => item.toMap()).toList(),
+      'ood': ood.toMap(),
+    };
+  }
+
+  factory ClassificationPrediction.fromMap(Map<String, dynamic> data) {
+    return ClassificationPrediction(
+      modelVersion: data['modelVersion'].toString(),
+      outputCount: (data['outputCount'] as num).toInt(),
+      topPredictions: (data['topPredictions'] as List)
+          .map((item) => TopPrediction.fromMap(Map<String, dynamic>.from(item)))
+          .toList(),
+      ood: OodEvaluation.fromMap(Map<String, dynamic>.from(data['ood'])),
+    );
+  }
 }
 
 class ProcessedImage {
@@ -170,6 +223,17 @@ class ClassificationLocation {
       'accuracy': accuracy,
       'source': sourceValue,
     };
+  }
+
+  factory ClassificationLocation.fromMap(Map<String, dynamic> data) {
+    return ClassificationLocation(
+      latitude: (data['latitude'] as num).toDouble(),
+      longitude: (data['longitude'] as num).toDouble(),
+      accuracy: (data['accuracy'] as num?)?.toDouble(),
+      source: data['source'] == 'manual'
+          ? ClassificationLocationSource.manual
+          : ClassificationLocationSource.gps,
+    );
   }
 }
 
