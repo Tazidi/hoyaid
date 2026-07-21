@@ -21,6 +21,7 @@ if (!admin.apps.length) {
 const db = admin.firestore();
 const bucket = admin.storage().bucket();
 const uploadImages = process.argv.includes('--upload-images');
+const restoreImageUrls = process.argv.includes('--restore-image-urls');
 
 function readJson(fileName) {
   const filePath = path.join(__dirname, fileName);
@@ -90,16 +91,62 @@ async function uploadReferenceImages(seed) {
   return uploaded;
 }
 
+async function restoreReferenceImageUrls(seed) {
+  let restored = 0;
+  let missing = 0;
+
+  for (const item of seed.items) {
+    if (!item.referenceStoragePath) continue;
+
+    const file = bucket.file(item.referenceStoragePath);
+    const [exists] = await file.exists();
+    if (!exists) {
+      console.warn(`Skip image for ${item.speciesId}: object Storage not found.`);
+      missing += 1;
+      continue;
+    }
+
+    const [metadata] = await file.getMetadata();
+    const existingTokens = metadata.metadata?.firebaseStorageDownloadTokens;
+    const token = existingTokens?.split(',').map((value) => value.trim()).find(Boolean) || crypto.randomUUID();
+
+    if (!existingTokens) {
+      await file.setMetadata({
+        metadata: {
+          ...(metadata.metadata || {}),
+          firebaseStorageDownloadTokens: token,
+        },
+      });
+    }
+
+    item.referenceImageUrl = downloadUrlFor(item.referenceStoragePath, token);
+    restored += 1;
+  }
+
+  return { restored, missing };
+}
+
 async function seedSpecies(batch, seed) {
   const now = admin.firestore.FieldValue.serverTimestamp();
   const collectionName = seed.collection || 'species';
 
   for (const item of seed.items) {
     const ref = db.collection(collectionName).doc(item.speciesId);
+    const data = { ...item };
+
+    // A null/empty URL in the local seed must not erase an image already
+    // stored in Firestore. `--upload-images` supplies a fresh URL explicitly.
+    if (
+      typeof data.referenceImageUrl !== 'string' ||
+      data.referenceImageUrl.trim().length === 0
+    ) {
+      delete data.referenceImageUrl;
+    }
+
     batch.set(
       ref,
       {
-        ...item,
+        ...data,
         updatedAt: now,
         createdAt: now,
       },
@@ -128,12 +175,20 @@ async function seedLabelMap(batch, seed) {
 }
 
 async function main() {
+  if (uploadImages && restoreImageUrls) {
+    throw new Error('Use only one image mode: --upload-images or --restore-image-urls.');
+  }
   const speciesSeed = readJson('species_seed.json');
   const labelMapSeed = readJson('label_map_hoya_model_v1.json');
 
   let uploadedImages = 0;
+  let restoredImages = 0;
+  let missingStorageImages = 0;
   if (uploadImages) {
     uploadedImages = await uploadReferenceImages(speciesSeed);
+  } else if (restoreImageUrls) {
+    ({ restored: restoredImages, missing: missingStorageImages } =
+      await restoreReferenceImageUrls(speciesSeed));
   }
 
   const batch = db.batch();
@@ -146,6 +201,10 @@ async function main() {
   console.log(`- label_map/${labelMapSeed.documentId}: 1 document`);
   if (uploadImages) {
     console.log(`- reference images uploaded: ${uploadedImages}`);
+  }
+  if (restoreImageUrls) {
+    console.log(`- reference image URLs restored: ${restoredImages}`);
+    console.log(`- reference images missing from Storage: ${missingStorageImages}`);
   }
 }
 

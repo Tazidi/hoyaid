@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hoyaid/shared/widgets/app_logo.dart';
 
 /// Splash screen — tampil 2 detik, lalu arahkan ke login.
 /// Di Batch 2, ini akan dicek status login dulu sebelum redirect.
@@ -81,39 +82,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Icon placeholder — ganti dengan logo asli
                 ScaleTransition(
                   scale: _pulseAnimation,
-                  child: Container(
-                    width: 120,
-                    height: 120,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(32),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.2),
-                          blurRadius: 20,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.local_florist,
-                      size: 72,
-                      color: Color(0xFF2E7D32),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  'iHoya',
-                  style: TextStyle(
-                    fontSize: 36,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    letterSpacing: 1.5,
-                  ),
+                  child: const AppLogo(height: 112),
                 ),
                 const SizedBox(height: 8),
                 Text(

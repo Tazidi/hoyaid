@@ -1,11 +1,11 @@
 {
-    "name": "ta_v1",
-    "short_name": "ta_v1",
+    "name": "iHoya",
+    "short_name": "iHoya",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "V1",
+    "description": "iHoya - Klasifikasi dan informasi spesies Hoya",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

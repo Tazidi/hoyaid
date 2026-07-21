@@ -6,6 +6,7 @@ import 'package:hoyaid/features/classification/providers/classification_provider
 import 'package:hoyaid/features/classification/services/offline_classification_queue_service.dart';
 import 'package:hoyaid/features/species/models/hoya_species.dart';
 import 'package:hoyaid/features/species/providers/species_provider.dart';
+import 'package:hoyaid/shared/widgets/app_logo.dart';
 import 'package:hoyaid/shared/widgets/interactive.dart';
 import 'package:intl/intl.dart';
 
@@ -56,7 +57,7 @@ class MainMenuScreen extends ConsumerWidget {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('iHoya'),
+        title: const AppLogo(height: 30),
         backgroundColor: Colors.transparent,
         actions: [
           Padding(

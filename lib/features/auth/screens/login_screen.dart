@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hoyaid/core/utils/error_messages.dart';
 import 'package:hoyaid/features/auth/providers/auth_provider.dart';
+import 'package:hoyaid/shared/widgets/app_logo.dart';
 import 'package:hoyaid/shared/widgets/interactive.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -111,7 +112,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   children: [
                     FadeSlideIn(
                       offsetY: 14,
-                      child: _BrandHeader(color: colorScheme.primary),
+                      child: const _BrandHeader(),
                     ),
                     const SizedBox(height: 22),
                     FadeSlideIn(
@@ -258,60 +259,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 }
 
 class _BrandHeader extends StatelessWidget {
-  final Color color;
-
-  const _BrandHeader({required this.color});
+  const _BrandHeader();
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Container(
-          width: 104,
-          height: 104,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Colors.white.withValues(alpha: 0.95),
-                color.withValues(alpha: 0.18),
-              ],
-            ),
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: color.withValues(alpha: 0.18),
-                blurRadius: 28,
-                offset: const Offset(0, 14),
-              ),
-            ],
-          ),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Icon(Icons.local_florist_rounded, size: 58, color: color),
-              Positioned(
-                right: 22,
-                top: 22,
-                child: Icon(
-                  Icons.auto_awesome_rounded,
-                  size: 18,
-                  color: Theme.of(context).colorScheme.tertiary,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          'iHoya',
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                fontWeight: FontWeight.w900,
-                color: color,
-              ),
-        ),
+        const AppLogo(height: 86),
         const SizedBox(height: 6),
         Text(
           'Asisten identifikasi Hoya berbasis foto',

@@ -8,6 +8,19 @@ import 'package:hoyaid/features/species/providers/species_provider.dart';
 import 'package:hoyaid/features/species/widgets/species_reference_image.dart';
 import 'package:hoyaid/shared/widgets/interactive.dart';
 
+enum _SpeciesSort {
+  all('Semua', Icons.apps_outlined),
+  medicalUse('Kegunaan medis', Icons.medical_services_outlined),
+  location('Lokasi', Icons.location_on_outlined),
+  nameAscending('Nama A-Z', Icons.sort_by_alpha),
+  nameDescending('Nama Z-A', Icons.sort_by_alpha_outlined);
+
+  const _SpeciesSort(this.label, this.icon);
+
+  final String label;
+  final IconData icon;
+}
+
 class SpeciesListScreen extends ConsumerStatefulWidget {
   const SpeciesListScreen({super.key});
 
@@ -18,9 +31,7 @@ class SpeciesListScreen extends ConsumerStatefulWidget {
 class _SpeciesListScreenState extends ConsumerState<SpeciesListScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
-  String _alphabetFilter = 'Semua';
-
-  static const _alphabetFilters = ['Semua', 'A-F', 'G-L', 'M-R', 'S-Z'];
+  _SpeciesSort _sort = _SpeciesSort.all;
 
   @override
   void dispose() {
@@ -48,7 +59,7 @@ class _SpeciesListScreenState extends ConsumerState<SpeciesListScreen> {
       ),
       body: speciesAsync.when(
         data: (species) {
-          final filtered = _filterSpecies(species);
+          final visibleSpecies = _filterAndSortSpecies(species);
 
           return RefreshIndicator(
             onRefresh: () async {
@@ -79,38 +90,47 @@ class _SpeciesListScreenState extends ConsumerState<SpeciesListScreen> {
                   },
                 ),
                 const SizedBox(height: 12),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      for (final filter in _alphabetFilters) ...[
-                        ChoiceChip(
-                          label: Text(filter),
-                          selected: _alphabetFilter == filter,
-                          onSelected: (_) {
-                            setState(() => _alphabetFilter = filter);
-                          },
-                        ),
-                        const SizedBox(width: 8),
-                      ],
-                    ],
+                DropdownButtonFormField<_SpeciesSort>(
+                  initialValue: _sort,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Urutkan berdasarkan',
+                    prefixIcon: Icon(Icons.sort),
+                    border: OutlineInputBorder(),
                   ),
+                  items: [
+                    for (final option in _SpeciesSort.values)
+                      DropdownMenuItem(
+                        value: option,
+                        child: Row(
+                          children: [
+                            Icon(option.icon, size: 20),
+                            const SizedBox(width: 12),
+                            Text(option.label),
+                          ],
+                        ),
+                      ),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) setState(() => _sort = value);
+                  },
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  '${filtered.length} dari ${species.length} spesies aktif',
+                  '${visibleSpecies.length} dari ${species.length} spesies aktif',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const SizedBox(height: 8),
-                if (filtered.isEmpty)
+                if (visibleSpecies.isEmpty)
                   const _EmptySpeciesState()
                 else
-                  for (final (index, item) in filtered.indexed)
+                  for (final (index, item) in visibleSpecies.indexed)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 10),
                       child: FadeSlideIn(
                         // Batasi delay agar item paling bawah tak menunggu lama.
-                        delay: Duration(milliseconds: (index * 45).clamp(0, 400)),
+                        delay:
+                            Duration(milliseconds: (index * 45).clamp(0, 400)),
                         offsetY: 16,
                         child: _SpeciesListItem(species: item),
                       ),
@@ -132,30 +152,45 @@ class _SpeciesListScreenState extends ConsumerState<SpeciesListScreen> {
     );
   }
 
-  List<HoyaSpecies> _filterSpecies(List<HoyaSpecies> species) {
-    return species.where((item) {
+  List<HoyaSpecies> _filterAndSortSpecies(List<HoyaSpecies> species) {
+    final visibleSpecies = species.where((item) {
       final matchesSearch = _query.isEmpty || item.searchText.contains(_query);
-      final matchesAlphabet = _alphabetFilter == 'Semua' ||
-          _matchesAlphabetFilter(item.sortKey, _alphabetFilter);
-      return matchesSearch && matchesAlphabet;
+      return matchesSearch;
     }).toList();
-  }
 
-  bool _matchesAlphabetFilter(String key, String filter) {
-    if (key.isEmpty) return false;
-    final first = key[0].toUpperCase();
-    switch (filter) {
-      case 'A-F':
-        return first.compareTo('A') >= 0 && first.compareTo('F') <= 0;
-      case 'G-L':
-        return first.compareTo('G') >= 0 && first.compareTo('L') <= 0;
-      case 'M-R':
-        return first.compareTo('M') >= 0 && first.compareTo('R') <= 0;
-      case 'S-Z':
-        return first.compareTo('S') >= 0 && first.compareTo('Z') <= 0;
-      default:
-        return true;
+    int compareByName(HoyaSpecies first, HoyaSpecies second) =>
+        first.sortKey.compareTo(second.sortKey);
+
+    switch (_sort) {
+      case _SpeciesSort.all:
+        break;
+      case _SpeciesSort.medicalUse:
+        visibleSpecies.sort((first, second) {
+          final byMedicalUse = (second.hasMedicalUse ? 1 : 0)
+              .compareTo(first.hasMedicalUse ? 1 : 0);
+          return byMedicalUse != 0
+              ? byMedicalUse
+              : compareByName(first, second);
+        });
+        break;
+      case _SpeciesSort.location:
+        visibleSpecies.sort((first, second) {
+          final byLocation = first.distribution
+              .trim()
+              .toLowerCase()
+              .compareTo(second.distribution.trim().toLowerCase());
+          return byLocation != 0 ? byLocation : compareByName(first, second);
+        });
+        break;
+      case _SpeciesSort.nameAscending:
+        visibleSpecies.sort(compareByName);
+        break;
+      case _SpeciesSort.nameDescending:
+        visibleSpecies.sort((first, second) => compareByName(second, first));
+        break;
     }
+
+    return visibleSpecies;
   }
 }
 
@@ -170,55 +205,65 @@ class _SpeciesListItem extends StatelessWidget {
       onTap: () => context.push('/species/${species.speciesId}'),
       pressedScale: 0.97,
       child: Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => context.push('/species/${species.speciesId}'),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              SpeciesReferenceImage(
-                imageUrl: species.referenceImageUrl,
-                width: 76,
-                height: 76,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      species.displayName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      species.localName ?? '-',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        _TinyBadge(label: species.speciesId),
-                        if (species.isRare) const _TinyBadge(label: 'Langka'),
-                      ],
-                    ),
-                  ],
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => context.push('/species/${species.speciesId}'),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                SpeciesReferenceImage(
+                  imageUrl: species.referenceImageUrl,
+                  width: 76,
+                  height: 76,
                 ),
-              ),
-              const Icon(Icons.chevron_right),
-            ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        species.displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        species.localName ?? '-',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Lokasi: ${species.distribution}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          _TinyBadge(label: species.speciesId),
+                          if (species.hasMedicalUse)
+                            const _TinyBadge(label: 'Kegunaan medis'),
+                          if (species.isRare) const _TinyBadge(label: 'Langka'),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right),
+              ],
+            ),
           ),
         ),
-      ),
       ),
     );
   }
@@ -235,19 +280,7 @@ class _SpeciesLoadingSkeleton extends StatelessWidget {
       children: [
         const ShimmerBox(height: 52),
         const SizedBox(height: 12),
-        SizedBox(
-          height: 34,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: 5,
-            separatorBuilder: (_, __) => const SizedBox(width: 8),
-            itemBuilder: (_, __) => const ShimmerBox(
-              width: 64,
-              height: 34,
-              borderRadius: BorderRadius.all(Radius.circular(999)),
-            ),
-          ),
-        ),
+        const ShimmerBox(height: 56),
         const SizedBox(height: 20),
         for (int i = 0; i < 6; i++)
           const Padding(
