@@ -5,7 +5,10 @@ import 'package:hoyaid/features/history/models/classification_record.dart';
 import 'package:hoyaid/features/history/services/history_service.dart';
 
 final historyServiceProvider = Provider<HistoryService>((ref) {
-  return HistoryService();
+  return HistoryService(
+    firestore: ref.watch(activeFirestoreProvider),
+    functions: ref.watch(activeFunctionsProvider),
+  );
 });
 
 final classificationDetailProvider = StreamProvider.autoDispose

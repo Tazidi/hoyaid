@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hoyaid/core/utils/error_messages.dart';
 import 'package:hoyaid/features/classification/providers/classification_provider.dart';
+import 'package:hoyaid/features/classification/screens/classification_crop_screen.dart';
 import 'package:hoyaid/features/classification/services/camera_permission_service.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -23,6 +24,7 @@ class _ClassificationCameraScreenState
   List<CameraDescription> _cameras = const [];
   int _cameraIndex = 0;
   bool _isTakingPicture = false;
+  bool _isSwitchingCamera = false;
   CameraPermissionResult? _permissionResult;
   String? _errorMessage;
 
@@ -61,8 +63,12 @@ class _ClassificationCameraScreenState
         return;
       }
 
-      _cameras = cameras;
-      await _openCamera(_cameraIndex);
+      final initialCameraIndex = _defaultCameraIndex(cameras);
+      setState(() {
+        _cameras = cameras;
+        _cameraIndex = initialCameraIndex;
+      });
+      await _openCamera(initialCameraIndex);
     } catch (error) {
       if (!mounted) return;
       setState(
@@ -71,6 +77,32 @@ class _ClassificationCameraScreenState
           fallback: 'Gagal membuka kamera. Coba lagi atau pilih dari galeri.',
         ),
       );
+    }
+  }
+
+  int _defaultCameraIndex(List<CameraDescription> cameras) {
+    final mainCameraIndex = cameras.indexWhere(
+      (camera) => camera.lensDirection == CameraLensDirection.back,
+    );
+    return mainCameraIndex == -1 ? 0 : mainCameraIndex;
+  }
+
+  String _cameraLabel(int index) {
+    final camera = _cameras[index];
+    switch (camera.lensDirection) {
+      case CameraLensDirection.back:
+        final rearPosition = _cameras
+                .take(index + 1)
+                .where((item) => item.lensDirection == CameraLensDirection.back)
+                .length -
+            1;
+        return rearPosition == 0
+            ? 'Kamera utama'
+            : 'Lensa belakang ${rearPosition + 1}';
+      case CameraLensDirection.front:
+        return 'Kamera depan';
+      case CameraLensDirection.external:
+        return 'Kamera eksternal';
     }
   }
 
@@ -93,10 +125,73 @@ class _ClassificationCameraScreenState
     if (mounted) setState(() {});
   }
 
-  Future<void> _switchCamera() async {
-    if (_cameras.length <= 1) return;
-    final nextIndex = (_cameraIndex + 1) % _cameras.length;
-    await _openCamera(nextIndex);
+  Future<void> _showLensPicker() async {
+    if (_cameras.length <= 1 || _isSwitchingCamera) return;
+    final selectedIndex = await showModalBottomSheet<int>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const ListTile(
+                leading: Icon(Icons.photo_camera_back_outlined),
+                title: Text('Pilih lensa'),
+                subtitle:
+                    Text('Hanya lensa yang tersedia di perangkat ditampilkan.'),
+              ),
+              RadioGroup<int>(
+                groupValue: _cameraIndex,
+                onChanged: (value) => Navigator.pop(context, value),
+                child: Column(
+                  children: [
+                    for (var index = 0; index < _cameras.length; index++)
+                      RadioListTile<int>(
+                        value: index,
+                        title: Text(_cameraLabel(index)),
+                        subtitle: Text('ID perangkat: ${_cameras[index].name}'),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    if (!mounted || selectedIndex == null || selectedIndex == _cameraIndex) {
+      return;
+    }
+
+    setState(() => _isSwitchingCamera = true);
+    try {
+      await _openCamera(selectedIndex);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              readableErrorMessage(
+                error,
+                fallback: 'Lensa tidak dapat dibuka. Pilih lensa lain.',
+              ),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSwitchingCamera = false);
+    }
+  }
+
+  Future<void> _reviewImage(XFile image) async {
+    final adjustedImage = await Navigator.of(context).push<XFile>(
+      MaterialPageRoute(
+        builder: (context) => ClassificationCropScreen(image: image),
+      ),
+    );
+    if (adjustedImage != null && mounted) context.pop<XFile>(adjustedImage);
   }
 
   Future<void> _takePicture() async {
@@ -108,7 +203,7 @@ class _ClassificationCameraScreenState
     try {
       await future;
       final image = await controller.takePicture();
-      if (mounted) context.pop<XFile>(image);
+      if (mounted) await _reviewImage(image);
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -134,7 +229,7 @@ class _ClassificationCameraScreenState
         imageQuality: 95,
         maxWidth: 2400,
       );
-      if (image != null && mounted) context.pop<XFile>(image);
+      if (image != null && mounted) await _reviewImage(image);
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -167,9 +262,9 @@ class _ClassificationCameraScreenState
           ),
           if (_cameras.length > 1)
             IconButton(
-              tooltip: 'Ganti kamera',
-              icon: const Icon(Icons.cameraswitch_outlined),
-              onPressed: _switchCamera,
+              tooltip: 'Pilih lensa',
+              icon: const Icon(Icons.camera_enhance_outlined),
+              onPressed: _isSwitchingCamera ? null : _showLensPicker,
             ),
         ],
       ),
@@ -203,10 +298,26 @@ class _ClassificationCameraScreenState
                           children: [
                             ColoredBox(
                               color: Colors.black,
-                              child: Center(
-                                child: AspectRatio(
-                                  aspectRatio: controller.value.aspectRatio,
-                                  child: CameraPreview(controller),
+                              child: _CameraPreviewViewport(
+                                  controller: controller),
+                            ),
+                            SafeArea(
+                              child: Align(
+                                alignment: Alignment.topCenter,
+                                child: Container(
+                                  margin: const EdgeInsets.only(top: 12),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 7,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.56),
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  child: Text(
+                                    _cameraLabel(_cameraIndex),
+                                    style: const TextStyle(color: Colors.white),
+                                  ),
                                 ),
                               ),
                             ),
@@ -229,10 +340,10 @@ class _ClassificationCameraScreenState
                                         onPressed: _takePicture,
                                       ),
                                       _RoundCameraButton(
-                                        tooltip: 'Ganti kamera',
-                                        icon: Icons.cameraswitch_outlined,
+                                        tooltip: 'Pilih lensa',
+                                        icon: Icons.camera_enhance_outlined,
                                         onPressed: _cameras.length > 1
-                                            ? _switchCamera
+                                            ? _showLensPicker
                                             : null,
                                       ),
                                     ],
@@ -244,6 +355,29 @@ class _ClassificationCameraScreenState
                         );
                       },
                     ),
+    );
+  }
+}
+
+class _CameraPreviewViewport extends StatelessWidget {
+  final CameraController controller;
+
+  const _CameraPreviewViewport({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    final rawAspectRatio = controller.value.aspectRatio;
+    final isPortrait =
+        MediaQuery.orientationOf(context) == Orientation.portrait;
+    final displayAspectRatio = isPortrait
+        ? (rawAspectRatio > 1 ? 1 / rawAspectRatio : rawAspectRatio)
+        : (rawAspectRatio < 1 ? 1 / rawAspectRatio : rawAspectRatio);
+
+    return Center(
+      child: AspectRatio(
+        aspectRatio: displayAspectRatio,
+        child: CameraPreview(controller),
+      ),
     );
   }
 }

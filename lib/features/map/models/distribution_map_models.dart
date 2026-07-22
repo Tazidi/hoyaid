@@ -20,9 +20,9 @@ enum DistributionVerificationFilter {
 
 extension DistributionBasemapX on DistributionBasemap {
   String get label => switch (this) {
-        DistributionBasemap.defaultMap => 'Default/Jalan',
-        DistributionBasemap.satellite => 'Satelit',
-        DistributionBasemap.topography => 'Topografi',
+        DistributionBasemap.defaultMap => 'Jalan (OpenStreetMap)',
+        DistributionBasemap.satellite => 'Citra satelit (Esri)',
+        DistributionBasemap.topography => 'Topografi (OpenTopoMap)',
       };
 
   String get urlTemplate => switch (this) {
@@ -33,6 +33,20 @@ extension DistributionBasemapX on DistributionBasemap {
               'World_Imagery/MapServer/tile/{z}/{y}/{x}',
         DistributionBasemap.topography =>
           'https://tile.opentopomap.org/{z}/{x}/{y}.png',
+      };
+
+  String get attribution => switch (this) {
+        DistributionBasemap.defaultMap => 'OpenStreetMap contributors',
+        DistributionBasemap.satellite =>
+          'Esri, Maxar, Earthstar Geographics, dan komunitas GIS',
+        DistributionBasemap.topography =>
+          'OpenStreetMap contributors, SRTM, OpenTopoMap',
+      };
+
+  String get compactAttribution => switch (this) {
+        DistributionBasemap.defaultMap => 'OpenStreetMap',
+        DistributionBasemap.satellite => 'Esri',
+        DistributionBasemap.topography => 'OSM • SRTM • OpenTopoMap',
       };
 }
 
@@ -55,17 +69,21 @@ class DistributionMapFilter {
   const DistributionMapFilter({
     this.scope = DistributionMapScope.all,
     this.basemap = DistributionBasemap.defaultMap,
-    this.verificationFilter = DistributionVerificationFilter.verified,
+    this.verificationFilter = DistributionVerificationFilter.all,
     this.speciesId,
     this.dateBucket,
-    this.verifiedOnly = true,
+    this.verifiedOnly = false,
   });
 
-  bool get hasActiveFilters =>
-      speciesId != null ||
-      dateBucket != null ||
-      verificationFilter != DistributionVerificationFilter.verified ||
-      basemap != DistributionBasemap.defaultMap;
+  int get activeFilterCount => [
+        scope != DistributionMapScope.all,
+        verificationFilter != DistributionVerificationFilter.all,
+        speciesId != null,
+        dateBucket != null,
+        basemap != DistributionBasemap.defaultMap,
+      ].where((isActive) => isActive).length;
+
+  bool get hasActiveFilters => activeFilterCount > 0;
 
   DistributionMapFilter copyWith({
     DistributionMapScope? scope,

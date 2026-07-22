@@ -44,6 +44,20 @@ class MainMenuScreen extends ConsumerWidget {
         color: const Color(0xFFE08B2D),
         onTap: () => context.push('/species'),
       ),
+      _MenuItem(
+        icon: Icons.speed_rounded,
+        label: 'Pengujian Perangkat',
+        subtitle: 'Benchmark TFLite lokal',
+        color: const Color(0xFF5C6BC0),
+        onTap: () => context.push('/benchmark'),
+      ),
+      _MenuItem(
+        icon: Icons.analytics_outlined,
+        label: 'Uji Akurasi D4',
+        subtitle: '355 citra uji TFLite',
+        color: const Color(0xFF00897B),
+        onTap: () => context.push('/benchmark/accuracy-d4'),
+      ),
       if (isAdmin)
         _MenuItem(
           icon: Icons.dashboard_customize_rounded,

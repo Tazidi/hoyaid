@@ -60,7 +60,7 @@ class _ClassificationScreenState extends ConsumerState<ClassificationScreen> {
   Future<void> _goToLogin() async {
     final user = ref.read(currentUserProvider);
     if (user?.isAnonymous == true) {
-      await ref.read(authServiceProvider).signOut();
+      await ref.read(accountSessionProvider).removeActiveAccount();
     }
     if (mounted) context.go('/login');
   }

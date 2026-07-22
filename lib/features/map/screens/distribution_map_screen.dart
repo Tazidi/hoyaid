@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_map_heatmap/flutter_map_heatmap.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hoyaid/core/utils/error_messages.dart';
@@ -12,6 +13,8 @@ import 'package:hoyaid/features/species/models/hoya_species.dart';
 import 'package:hoyaid/features/species/providers/species_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
+
+enum _MapDisplayMode { markers, heatmap }
 
 class DistributionMapScreen extends ConsumerStatefulWidget {
   const DistributionMapScreen({super.key});
@@ -25,15 +28,10 @@ class _DistributionMapScreenState extends ConsumerState<DistributionMapScreen> {
   static const _initialCenter = LatLng(-2.5489, 118.0149);
 
   final MapController _mapController = MapController();
-  final TextEditingController _dateBucketController = TextEditingController();
   DistributionMapFilter _filter = const DistributionMapFilter();
+  _MapDisplayMode _displayMode = _MapDisplayMode.markers;
+  int? _lastAutoFocusKey;
   double _zoom = 4.7;
-
-  @override
-  void dispose() {
-    _dateBucketController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,6 +46,7 @@ class _DistributionMapScreenState extends ConsumerState<DistributionMapScreen> {
     final pointsAsync = ref.watch(distributionMapPointsProvider(_filter));
     final points = pointsAsync.valueOrNull ?? const <DistributionMapPoint>[];
     final clusters = _clusterPoints(points, _zoom);
+    _scheduleAutoFocus(points);
 
     return Scaffold(
       appBar: AppBar(
@@ -84,29 +83,50 @@ class _DistributionMapScreenState extends ConsumerState<DistributionMapScreen> {
                   urlTemplate: _filter.basemap.urlTemplate,
                   userAgentPackageName: 'com.tazidi.hoyaid',
                 ),
-                MarkerLayer(
-                  markers: [
-                    for (final cluster in clusters)
-                      Marker(
-                        point: cluster.center,
-                        width: cluster.isSingle ? 48 : 58,
-                        height: cluster.isSingle ? 52 : 58,
-                        child: _ClusterMarker(
-                          cluster: cluster,
-                          onTap: () {
-                            if (cluster.isSingle) {
-                              _showPointSheet(
-                                cluster.first,
-                                speciesById[cluster.first.record.speciesId],
-                              );
-                            } else {
-                              _showClusterSheet(cluster, speciesById);
-                            }
-                          },
-                        ),
-                      ),
-                  ],
+                _BasemapAttribution(
+                  basemap: _filter.basemap,
                 ),
+                if (_displayMode == _MapDisplayMode.heatmap &&
+                    points.isNotEmpty)
+                  HeatMapLayer(
+                    key: ValueKey(_heatmapDataKey(points)),
+                    heatMapDataSource: InMemoryHeatMapDataSource(
+                      data: [
+                        for (final point in points)
+                          WeightedLatLng(point.point, 1),
+                      ],
+                    ),
+                    heatMapOptions: HeatMapOptions(
+                      radius: 42,
+                      minOpacity: 0.1,
+                      blurFactor: 0.8,
+                      layerOpacity: 0.78,
+                    ),
+                  )
+                else
+                  MarkerLayer(
+                    markers: [
+                      for (final cluster in clusters)
+                        Marker(
+                          point: cluster.center,
+                          width: cluster.isSingle ? 48 : 58,
+                          height: cluster.isSingle ? 52 : 58,
+                          child: _ClusterMarker(
+                            cluster: cluster,
+                            onTap: () {
+                              if (cluster.isSingle) {
+                                _showPointSheet(
+                                  cluster.first,
+                                  speciesById[cluster.first.record.speciesId],
+                                );
+                              } else {
+                                _showClusterSheet(cluster, speciesById);
+                              }
+                            },
+                          ),
+                        ),
+                    ],
+                  ),
               ],
             ),
           ),
@@ -114,20 +134,13 @@ class _DistributionMapScreenState extends ConsumerState<DistributionMapScreen> {
             left: 12,
             right: 12,
             top: 12,
-            child: _MapFilterPanel(
+            child: _MapControlBar(
               filter: _filter,
-              species: species,
-              canUseMine: canUseMine,
-              onChanged: (filter) {
-                setState(() {
-                  _filter = filter;
-                  if (filter.scope == DistributionMapScope.mine &&
-                      !canUseMine) {
-                    _filter = filter.copyWith(scope: DistributionMapScope.all);
-                  }
-                });
-              },
-              dateBucketController: _dateBucketController,
+              displayMode: _displayMode,
+              onTap: () => _showMapFilterSheet(
+                species: species,
+                canUseMine: canUseMine,
+              ),
             ),
           ),
           if (pointsAsync.isLoading)
@@ -172,18 +185,19 @@ class _DistributionMapScreenState extends ConsumerState<DistributionMapScreen> {
                 message: 'Coba longgarkan filter atau pilih mode lain.',
               ),
             ),
-          Positioned(
-            right: 16,
-            bottom: 16,
-            child: SafeArea(
-              child: FloatingActionButton.small(
-                heroTag: 'map-reset',
-                tooltip: 'Kembali ke Indonesia',
-                onPressed: () => _mapController.move(_initialCenter, 4.7),
-                child: const Icon(Icons.my_location_outlined),
+          if (points.isNotEmpty)
+            Positioned(
+              right: 16,
+              bottom: 16,
+              child: SafeArea(
+                child: FloatingActionButton.small(
+                  heroTag: 'map-fit-points',
+                  tooltip: 'Tampilkan semua temuan',
+                  onPressed: () => _focusOnPoints(points),
+                  child: const Icon(Icons.fit_screen_outlined),
+                ),
               ),
             ),
-          ),
           if (isAdmin)
             Positioned(
               left: 16,
@@ -198,6 +212,75 @@ class _DistributionMapScreenState extends ConsumerState<DistributionMapScreen> {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  void _scheduleAutoFocus(List<DistributionMapPoint> points) {
+    if (points.isEmpty) return;
+
+    final dataKey = _heatmapDataKey(points);
+    if (_lastAutoFocusKey == dataKey) return;
+    _lastAutoFocusKey = dataKey;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _focusOnPoints(points);
+    });
+  }
+
+  void _focusOnPoints(List<DistributionMapPoint> points) {
+    if (points.isEmpty) return;
+    if (points.length == 1) {
+      _mapController.move(points.first.point, 11.5);
+      return;
+    }
+
+    _mapController.fitCamera(
+      CameraFit.bounds(
+        bounds: LatLngBounds.fromPoints(
+            points.map((point) => point.point).toList()),
+        padding: const EdgeInsets.fromLTRB(28, 116, 28, 92),
+        maxZoom: 12,
+      ),
+    );
+  }
+
+  void _showMapFilterSheet({
+    required List<HoyaSpecies> species,
+    required bool canUseMine,
+  }) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (_) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.74,
+        minChildSize: 0.48,
+        maxChildSize: 0.94,
+        builder: (context, scrollController) => _MapFilterSheet(
+          filter: _filter,
+          species: species,
+          canUseMine: canUseMine,
+          displayMode: _displayMode,
+          scrollController: scrollController,
+          onApply: (filter, displayMode) {
+            var selectedFilter = filter;
+            if (selectedFilter.scope == DistributionMapScope.mine &&
+                !canUseMine) {
+              selectedFilter = selectedFilter.copyWith(
+                scope: DistributionMapScope.all,
+              );
+            }
+            setState(() {
+              _filter = selectedFilter;
+              _displayMode = displayMode;
+              _lastAutoFocusKey = null;
+            });
+          },
+        ),
       ),
     );
   }
@@ -239,6 +322,18 @@ class _DistributionMapScreenState extends ConsumerState<DistributionMapScreen> {
               items.length;
       return DistributionCluster(points: items, center: LatLng(lat, lng));
     }).toList();
+  }
+
+  int _heatmapDataKey(List<DistributionMapPoint> points) {
+    return Object.hashAll(
+      points.map(
+        (point) => Object.hash(
+          point.record.classificationId,
+          point.point.latitude,
+          point.point.longitude,
+        ),
+      ),
+    );
   }
 
   void _showPointSheet(DistributionMapPoint point, HoyaSpecies? species) {
@@ -286,8 +381,7 @@ class _DistributionMapScreenState extends ConsumerState<DistributionMapScreen> {
     DistributionCluster cluster,
     Map<String, HoyaSpecies> speciesById,
   ) {
-    final sortedPoints = [...cluster.points]
-      ..sort((a, b) {
+    final sortedPoints = [...cluster.points]..sort((a, b) {
         final aDate = a.record.createdAt;
         final bDate = b.record.createdAt;
         if (aDate == null && bDate == null) return 0;
@@ -359,170 +453,479 @@ class _DistributionMapScreenState extends ConsumerState<DistributionMapScreen> {
   }
 }
 
-class _MapFilterPanel extends StatelessWidget {
-  final DistributionMapFilter filter;
-  final List<HoyaSpecies> species;
-  final bool canUseMine;
-  final ValueChanged<DistributionMapFilter> onChanged;
-  final TextEditingController dateBucketController;
+class _BasemapAttribution extends StatelessWidget {
+  final DistributionBasemap basemap;
 
-  const _MapFilterPanel({
+  const _BasemapAttribution({required this.basemap});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Align(
+      alignment: Alignment.bottomLeft,
+      child: SafeArea(
+        top: false,
+        right: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),
+          child: Tooltip(
+            message: basemap.attribution,
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 210),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              decoration: BoxDecoration(
+                color: colors.surface.withValues(alpha: 0.9),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(
+                  color: colors.outlineVariant.withValues(alpha: 0.7),
+                ),
+              ),
+              child: Text(
+                '© ${basemap.compactAttribution}',
+                maxLines: 1,
+                softWrap: false,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      fontSize: 10,
+                      height: 1.1,
+                    ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MapControlBar extends StatelessWidget {
+  final DistributionMapFilter filter;
+  final _MapDisplayMode displayMode;
+  final VoidCallback onTap;
+
+  const _MapControlBar({
     required this.filter,
-    required this.species,
-    required this.canUseMine,
-    required this.onChanged,
-    required this.dateBucketController,
+    required this.displayMode,
+    required this.onTap,
   });
+
+  String get _summary {
+    final items = <String>[
+      filter.scope == DistributionMapScope.mine
+          ? 'Data saya'
+          : filter.verificationFilter == DistributionVerificationFilter.all
+              ? 'Semua temuan'
+              : filter.verificationFilter.label,
+      displayMode == _MapDisplayMode.markers ? 'Marker' : 'Heatmap',
+    ];
+    if (filter.speciesId != null) items.add('Spesies dipilih');
+    if (filter.dateBucket != null) items.add(filter.dateBucket!);
+    return items.join(' • ');
+  }
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      child: ExpansionTile(
-        initiallyExpanded: filter.hasActiveFilters,
-        leading: const Icon(Icons.tune),
-        title: const Text('Filter Peta'),
-        subtitle: Text(
-          filter.scope == DistributionMapScope.mine
-              ? 'Data saya'
-              : filter.verificationFilter.label,
-        ),
-        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        children: [
-          SegmentedButton<DistributionMapScope>(
-            segments: const [
-              ButtonSegment(
-                value: DistributionMapScope.all,
-                icon: Icon(Icons.public),
-                label: Text('Semua'),
-              ),
-              ButtonSegment(
-                value: DistributionMapScope.mine,
-                icon: Icon(Icons.person_pin_circle_outlined),
-                label: Text('Saya'),
-              ),
-            ],
-            selected: {filter.scope},
-            onSelectionChanged: (value) {
-              final selected = value.first;
-              if (selected == DistributionMapScope.mine && !canUseMine) return;
-              onChanged(filter.copyWith(scope: selected));
-            },
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<DistributionBasemap>(
-            initialValue: filter.basemap,
-            decoration: const InputDecoration(
-              labelText: 'Basemap',
-              prefixIcon: Icon(Icons.layers_outlined),
-            ),
-            items: [
-              for (final basemap in DistributionBasemap.values)
-                DropdownMenuItem(
-                  value: basemap,
-                  child: Text(basemap.label),
-                ),
-            ],
-            onChanged: (value) {
-              if (value == null) return;
-              onChanged(filter.copyWith(basemap: value));
-            },
-          ),
-          const SizedBox(height: 12),
-          SegmentedButton<DistributionVerificationFilter>(
-            segments: const [
-              ButtonSegment(
-                value: DistributionVerificationFilter.verified,
-                icon: Icon(Icons.verified_outlined),
-                label: Text('Terverifikasi'),
-              ),
-              ButtonSegment(
-                value: DistributionVerificationFilter.publicUnverified,
-                icon: Icon(Icons.public_outlined),
-                label: Text('Publik'),
-              ),
-              ButtonSegment(
-                value: DistributionVerificationFilter.all,
-                icon: Icon(Icons.layers_clear_outlined),
-                label: Text('Semua'),
-              ),
-            ],
-            selected: {filter.verificationFilter},
-            onSelectionChanged: (value) {
-              onChanged(filter.copyWith(verificationFilter: value.first));
-            },
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            initialValue: filter.speciesId ?? '',
-            isExpanded: true,
-            decoration: const InputDecoration(
-              labelText: 'Spesies',
-              prefixIcon: Icon(Icons.grass_outlined),
-            ),
-            items: [
-              const DropdownMenuItem(value: '', child: Text('Semua spesies')),
-              for (final item in species)
-                DropdownMenuItem(
-                  value: item.speciesId,
-                  child: Text(item.displayName),
-                ),
-            ],
-            onChanged: (value) {
-              onChanged(
-                filter.copyWith(
-                  speciesId: value,
-                  clearSpeciesId: value == null || value.isEmpty,
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 12),
-          Row(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(24),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+          child: Row(
             children: [
-              Expanded(
-                child: TextField(
-                  controller: dateBucketController,
-                  decoration: const InputDecoration(
-                    labelText: 'Bulan',
-                    hintText: 'YYYY-MM',
-                    prefixIcon: Icon(Icons.calendar_month_outlined),
-                  ),
-                  onSubmitted: (value) {
-                    final normalized = value.trim();
-                    onChanged(
-                      filter.copyWith(
-                        dateBucket: normalized,
-                        clearDateBucket: normalized.isEmpty,
-                      ),
-                    );
-                  },
-                ),
+              CircleAvatar(
+                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                foregroundColor:
+                    Theme.of(context).colorScheme.onPrimaryContainer,
+                child: const Icon(Icons.tune),
               ),
               const SizedBox(width: 12),
-              const Expanded(
-                child: _MarkerLegend(),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Filter & tampilan peta',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _summary,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+              Badge(
+                isLabelVisible: filter.hasActiveFilters,
+                label: Text(filter.activeFilterCount.toString()),
+                child: const Icon(Icons.chevron_right),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerRight,
-            child: FilledButton.icon(
-              onPressed: () {
-                final normalized = dateBucketController.text.trim();
-                onChanged(
-                  filter.copyWith(
-                    dateBucket: normalized,
-                    clearDateBucket: normalized.isEmpty,
-                  ),
-                );
-              },
-              icon: const Icon(Icons.check),
-              label: const Text('Terapkan'),
-            ),
-          ),
-        ],
+        ),
       ),
+    );
+  }
+}
+
+class _MapFilterSheet extends StatefulWidget {
+  final DistributionMapFilter filter;
+  final List<HoyaSpecies> species;
+  final bool canUseMine;
+  final _MapDisplayMode displayMode;
+  final ScrollController scrollController;
+  final void Function(DistributionMapFilter, _MapDisplayMode) onApply;
+
+  const _MapFilterSheet({
+    required this.filter,
+    required this.species,
+    required this.canUseMine,
+    required this.displayMode,
+    required this.scrollController,
+    required this.onApply,
+  });
+
+  @override
+  State<_MapFilterSheet> createState() => _MapFilterSheetState();
+}
+
+class _MapFilterSheetState extends State<_MapFilterSheet> {
+  static final _monthPattern = RegExp(r'^\d{4}-(0[1-9]|1[0-2])$');
+
+  late DistributionMapFilter _draftFilter;
+  late _MapDisplayMode _draftDisplayMode;
+  late TextEditingController _dateBucketController;
+
+  @override
+  void initState() {
+    super.initState();
+    _draftFilter = widget.filter;
+    _draftDisplayMode = widget.displayMode;
+    _dateBucketController = TextEditingController(
+      text: widget.filter.dateBucket ?? '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _dateBucketController.dispose();
+    super.dispose();
+  }
+
+  void _resetDataFilters() {
+    setState(() {
+      _draftFilter = DistributionMapFilter(basemap: _draftFilter.basemap);
+      _dateBucketController.clear();
+    });
+  }
+
+  void _apply() {
+    final month = _dateBucketController.text.trim();
+    if (month.isNotEmpty && !_monthPattern.hasMatch(month)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Format bulan harus YYYY-MM.')),
+      );
+      return;
+    }
+
+    final selectedFilter = _draftFilter.copyWith(
+      dateBucket: month,
+      clearDateBucket: month.isEmpty,
+    );
+    widget.onApply(selectedFilter, _draftDisplayMode);
+    Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      controller: widget.scrollController,
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Filter & tampilan peta',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Atur pilihan, lalu tekan Terapkan untuk memperbarui peta.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              tooltip: 'Tutup',
+              onPressed: () => Navigator.of(context).pop(),
+              icon: const Icon(Icons.close),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        const _MapControlSection(
+          icon: Icons.layers_outlined,
+          title: 'Tampilan peta',
+        ),
+        const SizedBox(height: 10),
+        SegmentedButton<_MapDisplayMode>(
+          segments: const [
+            ButtonSegment(
+              value: _MapDisplayMode.markers,
+              icon: Icon(Icons.location_pin),
+              label: Text('Marker'),
+            ),
+            ButtonSegment(
+              value: _MapDisplayMode.heatmap,
+              icon: Icon(Icons.local_fire_department_outlined),
+              label: Text('Heatmap'),
+            ),
+          ],
+          selected: {_draftDisplayMode},
+          onSelectionChanged: (value) {
+            setState(() => _draftDisplayMode = value.first);
+          },
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _BasemapQuickButton(
+                selected:
+                    _draftFilter.basemap == DistributionBasemap.defaultMap,
+                icon: Icons.map_outlined,
+                label: 'Jalan',
+                onPressed: () {
+                  setState(
+                    () => _draftFilter = _draftFilter.copyWith(
+                      basemap: DistributionBasemap.defaultMap,
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _BasemapQuickButton(
+                selected: _draftFilter.basemap == DistributionBasemap.satellite,
+                icon: Icons.satellite_alt_outlined,
+                label: 'Satelit',
+                onPressed: () {
+                  setState(
+                    () => _draftFilter = _draftFilter.copyWith(
+                      basemap: DistributionBasemap.satellite,
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _BasemapQuickButton(
+                selected:
+                    _draftFilter.basemap == DistributionBasemap.topography,
+                icon: Icons.terrain_outlined,
+                label: 'Topo',
+                onPressed: () {
+                  setState(
+                    () => _draftFilter = _draftFilter.copyWith(
+                      basemap: DistributionBasemap.topography,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: _draftDisplayMode == _MapDisplayMode.markers
+              ? const _MarkerLegend()
+              : const _HeatmapLegend(),
+        ),
+        const SizedBox(height: 24),
+        const _MapControlSection(
+          icon: Icons.filter_alt_outlined,
+          title: 'Data temuan',
+        ),
+        const SizedBox(height: 10),
+        SegmentedButton<DistributionMapScope>(
+          segments: [
+            const ButtonSegment(
+              value: DistributionMapScope.all,
+              icon: Icon(Icons.public),
+              label: Text('Semua'),
+            ),
+            ButtonSegment(
+              value: DistributionMapScope.mine,
+              enabled: widget.canUseMine,
+              icon: const Icon(Icons.person_pin_circle_outlined),
+              label: const Text('Saya'),
+            ),
+          ],
+          selected: {_draftFilter.scope},
+          onSelectionChanged: (value) {
+            setState(
+                () => _draftFilter = _draftFilter.copyWith(scope: value.first));
+          },
+        ),
+        const SizedBox(height: 12),
+        SegmentedButton<DistributionVerificationFilter>(
+          segments: const [
+            ButtonSegment(
+              value: DistributionVerificationFilter.verified,
+              icon: Icon(Icons.verified_outlined),
+              label: Text('Terverifikasi'),
+            ),
+            ButtonSegment(
+              value: DistributionVerificationFilter.publicUnverified,
+              icon: Icon(Icons.public_outlined),
+              label: Text('Publik'),
+            ),
+            ButtonSegment(
+              value: DistributionVerificationFilter.all,
+              icon: Icon(Icons.layers_clear_outlined),
+              label: Text('Semua'),
+            ),
+          ],
+          selected: {_draftFilter.verificationFilter},
+          onSelectionChanged: (value) {
+            setState(
+              () => _draftFilter = _draftFilter.copyWith(
+                verificationFilter: value.first,
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          key: ValueKey(_draftFilter.speciesId ?? ''),
+          initialValue: _draftFilter.speciesId ?? '',
+          isExpanded: true,
+          decoration: const InputDecoration(
+            labelText: 'Spesies',
+            prefixIcon: Icon(Icons.grass_outlined),
+          ),
+          items: [
+            const DropdownMenuItem(value: '', child: Text('Semua spesies')),
+            for (final item in widget.species)
+              DropdownMenuItem(
+                value: item.speciesId,
+                child: Text(item.displayName),
+              ),
+          ],
+          onChanged: (value) {
+            setState(
+              () => _draftFilter = _draftFilter.copyWith(
+                speciesId: value,
+                clearSpeciesId: value == null || value.isEmpty,
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _dateBucketController,
+          keyboardType: TextInputType.datetime,
+          decoration: const InputDecoration(
+            labelText: 'Bulan temuan',
+            hintText: 'YYYY-MM, mis. 2026-07',
+            prefixIcon: Icon(Icons.calendar_month_outlined),
+          ),
+        ),
+        const SizedBox(height: 24),
+        Row(
+          children: [
+            Expanded(
+              child: TextButton.icon(
+                onPressed: _resetDataFilters,
+                icon: const Icon(Icons.restart_alt),
+                label: const Text('Reset filter'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: _apply,
+                icon: const Icon(Icons.check),
+                label: const Text('Terapkan'),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _BasemapQuickButton extends StatelessWidget {
+  final bool selected;
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+
+  const _BasemapQuickButton({
+    required this.selected,
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: 'Peta $label',
+      child: OutlinedButton(
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(0, 72),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+          backgroundColor: selected ? colors.primaryContainer : null,
+          foregroundColor:
+              selected ? colors.onPrimaryContainer : colors.onSurface,
+          side: BorderSide(
+            color: selected ? colors.primary : colors.outlineVariant,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 22),
+            const SizedBox(height: 4),
+            Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MapControlSection extends StatelessWidget {
+  final IconData icon;
+  final String title;
+
+  const _MapControlSection({required this.icon, required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
+        const SizedBox(width: 8),
+        Text(title, style: Theme.of(context).textTheme.titleMedium),
+      ],
     );
   }
 }
@@ -625,6 +1028,41 @@ class _MarkerLegend extends StatelessWidget {
       children: [
         _LegendItem(color: Colors.green, label: 'Terverifikasi Ahli'),
         _LegendItem(color: Colors.orange, label: 'Pending/Unverified'),
+      ],
+    );
+  }
+}
+
+class _HeatmapLegend extends StatelessWidget {
+  const _HeatmapLegend();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Wrap(
+      spacing: 8,
+      runSpacing: 6,
+      children: [
+        _HeatmapLegendItem(color: Colors.blue, label: 'Rendah'),
+        _HeatmapLegendItem(color: Colors.red, label: 'Tinggi'),
+      ],
+    );
+  }
+}
+
+class _HeatmapLegendItem extends StatelessWidget {
+  final Color color;
+  final String label;
+
+  const _HeatmapLegendItem({required this.color, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.circle, color: color, size: 14),
+        const SizedBox(width: 4),
+        Text(label, style: Theme.of(context).textTheme.bodySmall),
       ],
     );
   }

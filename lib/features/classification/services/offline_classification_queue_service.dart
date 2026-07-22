@@ -14,12 +14,15 @@ class OfflineClassificationQueueService {
   static const queueKey = 'offline_classification_queue_v1';
 
   final ClassificationService _classificationService;
+  final FirebaseAuth _firebaseAuth;
   bool _isSyncing = false;
 
   OfflineClassificationQueueService({
     ClassificationService? classificationService,
-  }) : _classificationService =
-            classificationService ?? ClassificationService();
+    FirebaseAuth? firebaseAuth,
+  })  : _classificationService =
+            classificationService ?? ClassificationService(),
+        _firebaseAuth = firebaseAuth ?? FirebaseAuth.instance;
 
   Future<OfflineClassificationItem> enqueue({
     required String userId,
@@ -70,7 +73,7 @@ class OfflineClassificationQueueService {
     if (!await _isOnline()) {
       return const OfflineSyncResult(message: 'Tidak ada koneksi internet.');
     }
-    final user = FirebaseAuth.instance.currentUser;
+    final user = _firebaseAuth.currentUser;
     if (user == null || user.isAnonymous) {
       return const OfflineSyncResult(
         message:

@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hoyaid/core/router/app_router.dart';
 import 'package:hoyaid/core/theme/app_theme.dart';
+import 'package:hoyaid/features/auth/providers/auth_provider.dart';
 import 'package:hoyaid/features/classification/providers/classification_provider.dart';
 import 'package:hoyaid/features/classification/services/offline_sync_reminder_service.dart';
 import 'package:hoyaid/firebase_options.dart';
@@ -76,10 +77,25 @@ class HoyaApp extends ConsumerStatefulWidget {
 
 class _HoyaAppState extends ConsumerState<HoyaApp> {
   StreamSubscription? _syncSubscription;
+  String? _syncSessionKey;
 
   @override
   void initState() {
     super.initState();
+    ref.listenManual(
+      accountSessionProvider,
+      (_, __) => _restartAutoSync(),
+      fireImmediately: true,
+    );
+  }
+
+  void _restartAutoSync() {
+    final session = ref.read(accountSessionProvider);
+    final sessionKey = '${session.activeSlot.name}:${session.currentUser?.uid}';
+    if (_syncSessionKey == sessionKey) return;
+
+    _syncSubscription?.cancel();
+    _syncSessionKey = sessionKey;
     _syncSubscription =
         ref.read(offlineClassificationQueueServiceProvider).startAutoSync();
   }

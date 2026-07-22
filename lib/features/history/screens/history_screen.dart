@@ -445,7 +445,7 @@ class _HistoryFilterPanelState extends State<_HistoryFilterPanel> {
                 icon: const Icon(Icons.filter_alt_off_outlined),
               )
             : null,
-        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
         children: [
           DropdownButtonFormField<ClassificationSortOrder>(
             initialValue: filter.sortOrder,
@@ -493,109 +493,48 @@ class _HistoryFilterPanelState extends State<_HistoryFilterPanel> {
             },
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  initialValue: filter.confidenceBucket ?? '',
-                  decoration: const InputDecoration(
-                    labelText: 'Confidence',
-                    prefixIcon: Icon(Icons.speed_outlined),
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: '', child: Text('Semua')),
-                    DropdownMenuItem(value: 'high', child: Text('High')),
-                    DropdownMenuItem(value: 'medium', child: Text('Medium')),
-                    DropdownMenuItem(value: 'low', child: Text('Low')),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final stackFields = constraints.maxWidth < 360;
+              final confidence = _buildConfidenceField(filter);
+              final verification = _buildVerificationField(filter);
+              final month = _buildMonthField();
+              final location = _buildLocationField(filter);
+
+              if (stackFields) {
+                return Column(
+                  children: [
+                    confidence,
+                    const SizedBox(height: 12),
+                    verification,
+                    const SizedBox(height: 12),
+                    month,
+                    const SizedBox(height: 12),
+                    location,
                   ],
-                  onChanged: (value) {
-                    widget.onChanged(
-                      filter.copyWith(
-                        confidenceBucket: value,
-                        clearConfidenceBucket: value == null || value.isEmpty,
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  initialValue: filter.verificationStatus ?? '',
-                  decoration: const InputDecoration(
-                    labelText: 'Verifikasi',
-                    prefixIcon: Icon(Icons.fact_check_outlined),
+                );
+              }
+
+              return Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(child: confidence),
+                      const SizedBox(width: 12),
+                      Expanded(child: verification),
+                    ],
                   ),
-                  items: const [
-                    DropdownMenuItem(value: '', child: Text('Semua')),
-                    DropdownMenuItem(
-                      value: 'unverified',
-                      child: Text('Unverified'),
-                    ),
-                    DropdownMenuItem(
-                        value: 'verified', child: Text('Verified')),
-                    DropdownMenuItem(
-                        value: 'rejected', child: Text('Rejected')),
-                  ],
-                  onChanged: (value) {
-                    widget.onChanged(
-                      filter.copyWith(
-                        verificationStatus: value,
-                        clearVerificationStatus: value == null || value.isEmpty,
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _dateBucketController,
-                  decoration: const InputDecoration(
-                    labelText: 'Bulan',
-                    hintText: 'YYYY-MM',
-                    prefixIcon: Icon(Icons.calendar_month_outlined),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(child: month),
+                      const SizedBox(width: 12),
+                      Expanded(child: location),
+                    ],
                   ),
-                  textInputAction: TextInputAction.done,
-                  onSubmitted: _submitDateBucket,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  initialValue: filter.hasLocation == null
-                      ? ''
-                      : filter.hasLocation == true
-                          ? 'yes'
-                          : 'no',
-                  decoration: const InputDecoration(
-                    labelText: 'Lokasi',
-                    prefixIcon: Icon(Icons.place_outlined),
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: '', child: Text('Semua')),
-                    DropdownMenuItem(value: 'yes', child: Text('Ada')),
-                    DropdownMenuItem(value: 'no', child: Text('Tanpa')),
-                  ],
-                  onChanged: (value) {
-                    widget.onChanged(
-                      filter.copyWith(
-                        hasLocation: value == 'yes'
-                            ? true
-                            : value == 'no'
-                                ? false
-                                : null,
-                        clearHasLocation: value == null || value.isEmpty,
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
+                ],
+              );
+            },
           ),
           if (widget.isAdmin && widget.scope == ClassificationScope.public) ...[
             const SizedBox(height: 12),
@@ -626,6 +565,98 @@ class _HistoryFilterPanelState extends State<_HistoryFilterPanel> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildConfidenceField(HistoryFilter filter) {
+    return DropdownButtonFormField<String>(
+      initialValue: filter.confidenceBucket ?? '',
+      decoration: const InputDecoration(
+        labelText: 'Confidence',
+        prefixIcon: Icon(Icons.speed_outlined),
+      ),
+      items: const [
+        DropdownMenuItem(value: '', child: Text('Semua')),
+        DropdownMenuItem(value: 'high', child: Text('High')),
+        DropdownMenuItem(value: 'medium', child: Text('Medium')),
+        DropdownMenuItem(value: 'low', child: Text('Low')),
+      ],
+      onChanged: (value) {
+        widget.onChanged(
+          filter.copyWith(
+            confidenceBucket: value,
+            clearConfidenceBucket: value == null || value.isEmpty,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildVerificationField(HistoryFilter filter) {
+    return DropdownButtonFormField<String>(
+      initialValue: filter.verificationStatus ?? '',
+      decoration: const InputDecoration(
+        labelText: 'Verifikasi',
+        prefixIcon: Icon(Icons.fact_check_outlined),
+      ),
+      items: const [
+        DropdownMenuItem(value: '', child: Text('Semua')),
+        DropdownMenuItem(value: 'unverified', child: Text('Unverified')),
+        DropdownMenuItem(value: 'verified', child: Text('Verified')),
+        DropdownMenuItem(value: 'rejected', child: Text('Rejected')),
+      ],
+      onChanged: (value) {
+        widget.onChanged(
+          filter.copyWith(
+            verificationStatus: value,
+            clearVerificationStatus: value == null || value.isEmpty,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMonthField() {
+    return TextField(
+      controller: _dateBucketController,
+      decoration: const InputDecoration(
+        labelText: 'Bulan',
+        hintText: 'YYYY-MM',
+        prefixIcon: Icon(Icons.calendar_month_outlined),
+      ),
+      textInputAction: TextInputAction.done,
+      onSubmitted: _submitDateBucket,
+    );
+  }
+
+  Widget _buildLocationField(HistoryFilter filter) {
+    return DropdownButtonFormField<String>(
+      initialValue: filter.hasLocation == null
+          ? ''
+          : filter.hasLocation == true
+              ? 'yes'
+              : 'no',
+      decoration: const InputDecoration(
+        labelText: 'Lokasi',
+        prefixIcon: Icon(Icons.place_outlined),
+      ),
+      items: const [
+        DropdownMenuItem(value: '', child: Text('Semua')),
+        DropdownMenuItem(value: 'yes', child: Text('Ada')),
+        DropdownMenuItem(value: 'no', child: Text('Tanpa')),
+      ],
+      onChanged: (value) {
+        widget.onChanged(
+          filter.copyWith(
+            hasLocation: value == 'yes'
+                ? true
+                : value == 'no'
+                    ? false
+                    : null,
+            clearHasLocation: value == null || value.isEmpty,
+          ),
+        );
+      },
     );
   }
 

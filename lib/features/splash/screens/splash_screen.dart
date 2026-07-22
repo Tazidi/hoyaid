@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hoyaid/features/auth/providers/auth_provider.dart';
 import 'package:hoyaid/shared/widgets/app_logo.dart';
 
 /// Splash screen — tampil 2 detik, lalu arahkan ke login.
@@ -52,12 +53,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
     _controller.forward();
 
-    // Redirect setelah 2.5 detik
-    // TODO Batch 2: Ganti dengan cek status auth + redirect ke /home atau /login
-    Timer(const Duration(milliseconds: 2500), () {
-      if (mounted) {
-        context.go('/login');
-      }
+    // Tunggu pemulihan kedua sesi sebelum auth guard menentukan tujuan.
+    Timer(const Duration(milliseconds: 2500), () async {
+      await ref.read(accountSessionProvider).initialize();
+      if (mounted) context.go('/home');
     });
   }
 

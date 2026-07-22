@@ -5,6 +5,28 @@ import 'package:hoyaid/features/classification/models/classification_models.dart
 import 'package:image/image.dart' as img;
 
 class ImagePreprocessService {
+  /// Preprocessing kanonik untuk evaluasi model D4_6.
+  ///
+  /// Training/evaluasi desktop model memakai EXIF transpose -> RGB ->
+  /// resize-with-pad hitam 224×224 -> nilai piksel mentah [0,255]. Metode ini
+  /// sengaja terpisah dari alur klasifikasi pengguna yang saat ini memakai
+  /// center-crop, agar uji kuantisasi dapat menahan preprocessing tetap sama.
+  Future<Object> processEvaluationModelInput({
+    required String imagePath,
+    required int modelSize,
+    required bool floatInput,
+  }) async {
+    final bytes = await File(imagePath).readAsBytes();
+    final decoded = img.decodeImage(bytes);
+    if (decoded == null) {
+      throw StateError('File gambar tidak dapat dibaca.');
+    }
+
+    final oriented = img.bakeOrientation(decoded);
+    final modelImage = _resizeWithPad(oriented, modelSize);
+    return _toModelInput(modelImage, floatInput: floatInput);
+  }
+
   Future<ProcessedImage> processFile({
     required String imagePath,
     required int modelSize,
@@ -83,6 +105,35 @@ class ImagePreprocessService {
     final y = ((source.height - side) / 2).round();
     return img.copyCrop(source, x: x, y: y, width: side, height: side);
   }
+  img.Image _resizeWithPad(img.Image source, int targetSize) {
+    final scale = targetSize /
+        (source.width > source.height ? source.width : source.height);
+    final resizedWidth = (source.width * scale).round().clamp(1, targetSize).toInt();
+    final resizedHeight =
+        (source.height * scale).round().clamp(1, targetSize).toInt();
+    final resized = img.copyResize(
+      source,
+      width: resizedWidth,
+      height: resizedHeight,
+      interpolation: img.Interpolation.linear,
+    );
+    final canvas =
+        img.Image(width: targetSize, height: targetSize, numChannels: 3);
+    for (final pixel in canvas) {
+      pixel
+        ..r = 0
+        ..g = 0
+        ..b = 0;
+    }
+    img.compositeImage(
+      canvas,
+      resized,
+      dstX: (targetSize - resizedWidth) ~/ 2,
+      dstY: (targetSize - resizedHeight) ~/ 2,
+    );
+    return canvas;
+  }
+
 
   Object _toModelInput(img.Image image, {required bool floatInput}) {
     return [

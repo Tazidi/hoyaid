@@ -41,6 +41,7 @@ dependencies:
   image: ^4.2.0
   tflite_flutter: ^0.11.0
   flutter_map: ^7.0.2
+  flutter_map_heatmap: ^0.0.8
   latlong2: ^0.9.1
 
   # ML Kit - plant/object filter (pre-classification gate)

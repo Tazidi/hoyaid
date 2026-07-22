@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hoyaid/features/auth/providers/auth_provider.dart';
 import 'package:hoyaid/features/classification/services/camera_permission_service.dart';
 import 'package:hoyaid/features/classification/services/classification_config_service.dart';
 import 'package:hoyaid/features/classification/services/classification_pipeline_service.dart';
@@ -14,11 +15,14 @@ import 'package:hoyaid/features/classification/services/tflite_service.dart';
 
 final classificationConfigServiceProvider =
     Provider<ClassificationConfigService>((ref) {
-  return ClassificationConfigService();
+  return ClassificationConfigService(
+    firestore: ref.watch(activeFirestoreProvider),
+    storage: ref.watch(activeStorageProvider),
+  );
 });
 
 final labelMapServiceProvider = Provider<LabelMapService>((ref) {
-  return LabelMapService();
+  return LabelMapService(firestore: ref.watch(activeFirestoreProvider));
 });
 
 final imagePreprocessServiceProvider = Provider<ImagePreprocessService>((ref) {
@@ -34,7 +38,10 @@ final oodServiceProvider = Provider<OodService>((ref) {
 });
 
 final tfliteServiceProvider = Provider<TFLiteService>((ref) {
-  final service = TFLiteService(oodService: ref.watch(oodServiceProvider));
+  final service = TFLiteService(
+    oodService: ref.watch(oodServiceProvider),
+    storage: ref.watch(activeStorageProvider),
+  );
   ref.onDispose(service.dispose);
   return service;
 });
@@ -67,13 +74,17 @@ final classificationPipelineServiceProvider =
 });
 
 final classificationServiceProvider = Provider<ClassificationService>((ref) {
-  return ClassificationService();
+  return ClassificationService(
+    functions: ref.watch(activeFunctionsProvider),
+    storage: ref.watch(activeStorageProvider),
+  );
 });
 
 final offlineClassificationQueueServiceProvider =
     Provider<OfflineClassificationQueueService>((ref) {
   return OfflineClassificationQueueService(
     classificationService: ref.watch(classificationServiceProvider),
+    firebaseAuth: ref.watch(activeFirebaseAuthProvider),
   );
 });
 

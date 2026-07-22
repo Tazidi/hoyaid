@@ -1,11 +1,11 @@
-import 'dart:async';
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hoyaid/features/auth/providers/auth_provider.dart';
 import 'package:hoyaid/features/auth/screens/login_screen.dart';
 import 'package:hoyaid/features/auth/screens/register_screen.dart';
 import 'package:hoyaid/features/auth/screens/profile_screen.dart';
+import 'package:hoyaid/features/benchmark/screens/on_device_benchmark_screen.dart';
+import 'package:hoyaid/features/benchmark/screens/d4_accuracy_evaluation_screen.dart';
 import 'package:hoyaid/features/admin/screens/admin_dashboard_screen.dart';
 import 'package:hoyaid/features/admin/screens/admin_export_screen.dart';
 import 'package:hoyaid/features/admin/screens/admin_model_upload_screen.dart';
@@ -27,34 +27,16 @@ import 'package:hoyaid/features/species/screens/species_detail_screen.dart';
 import 'package:hoyaid/features/species/screens/species_list_screen.dart';
 import 'package:hoyaid/features/splash/screens/splash_screen.dart';
 
-/// Custom Listenable to wrap Stream for GoRouter refreshListenable
-class GoRouterRefreshStream extends ChangeNotifier {
-  GoRouterRefreshStream(Stream<dynamic> stream) {
-    notifyListeners();
-    _subscription = stream.asBroadcastStream().listen(
-          (dynamic _) => notifyListeners(),
-        );
-  }
-
-  late final StreamSubscription<dynamic> _subscription;
-
-  @override
-  void dispose() {
-    _subscription.cancel();
-    super.dispose();
-  }
-}
-
 /// Provider untuk GoRouter dengan Auth Guard
 final appRouterProvider = Provider<GoRouter>((ref) {
-  final authService = ref.read(authServiceProvider);
+  final accountSession = ref.read(accountSessionProvider);
 
   return GoRouter(
     initialLocation: '/splash',
     debugLogDiagnostics: true,
-    refreshListenable: GoRouterRefreshStream(authService.authStateChanges),
+    refreshListenable: accountSession,
     redirect: (context, state) {
-      final isLoggedIn = authService.currentUser != null;
+      final isLoggedIn = accountSession.currentUser != null;
       final isSplash = state.matchedLocation == '/splash';
       final isLogin = state.matchedLocation == '/login';
       final isRegister = state.matchedLocation == '/register';
@@ -99,6 +81,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/profile',
         name: 'profile',
         builder: (context, state) => const ProfileScreen(),
+      ),
+      GoRoute(
+        path: '/benchmark',
+        name: 'on-device-benchmark',
+        builder: (context, state) => const OnDeviceBenchmarkScreen(),
+      ),
+      GoRoute(
+        path: '/benchmark/accuracy-d4',
+        name: 'd4-accuracy-evaluation',
+        builder: (context, state) => const D4AccuracyEvaluationScreen(),
       ),
       GoRoute(
         path: '/classification',
