@@ -118,114 +118,114 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     FadeSlideIn(
                       delay: const Duration(milliseconds: 140),
                       child: Card(
-                      elevation: 0,
-                      color: colorScheme.surface.withValues(alpha: 0.92),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(28),
-                        side: BorderSide(
-                          color: colorScheme.outlineVariant
-                              .withValues(alpha: 0.55),
+                        elevation: 0,
+                        color: colorScheme.surface.withValues(alpha: 0.92),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(28),
+                          side: BorderSide(
+                            color: colorScheme.outlineVariant
+                                .withValues(alpha: 0.55),
+                          ),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                'Masuk ke akun',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .headlineSmall
+                                    ?.copyWith(fontWeight: FontWeight.w900),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Simpan riwayat klasifikasi dan jelajahi data Hoya dengan lebih nyaman.',
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                              const SizedBox(height: 18),
+                              const Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  _FeaturePill(
+                                    icon: Icons.photo_camera_rounded,
+                                    label: 'Identifikasi cepat',
+                                  ),
+                                  _FeaturePill(
+                                    icon: Icons.history_rounded,
+                                    label: 'Riwayat tersimpan',
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 22),
+                              TextField(
+                                controller: _emailController,
+                                keyboardType: TextInputType.emailAddress,
+                                decoration: InputDecoration(
+                                  labelText: 'Email',
+                                  hintText: 'nama@email.com',
+                                  prefixIcon: const Icon(Icons.email_rounded),
+                                  filled: true,
+                                  fillColor: colorScheme.surfaceContainerHighest
+                                      .withValues(alpha: 0.45),
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              TextField(
+                                controller: _passwordController,
+                                obscureText: true,
+                                decoration: InputDecoration(
+                                  labelText: 'Kata Sandi',
+                                  hintText: 'Masukkan kata sandi',
+                                  prefixIcon: const Icon(Icons.lock_rounded),
+                                  filled: true,
+                                  fillColor: colorScheme.surfaceContainerHighest
+                                      .withValues(alpha: 0.45),
+                                ),
+                              ),
+                              const SizedBox(height: 22),
+                              FilledButton.icon(
+                                style: FilledButton.styleFrom(
+                                  minimumSize: const Size.fromHeight(52),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(18),
+                                  ),
+                                ),
+                                onPressed: _isBusy ? null : _loginEmail,
+                                icon: _isLoading
+                                    ? const _SmallLoader()
+                                    : const Icon(Icons.login_rounded),
+                                label: const Text('Masuk'),
+                              ),
+                              const SizedBox(height: 12),
+                              OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  minimumSize: const Size.fromHeight(50),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(18),
+                                  ),
+                                ),
+                                onPressed: _isBusy ? null : _loginGoogle,
+                                icon: _isGoogleLoading
+                                    ? const _SmallLoader()
+                                    : const Icon(Icons.g_mobiledata_rounded,
+                                        size: 28),
+                                label: const Text('Masuk dengan Google'),
+                              ),
+                              const SizedBox(height: 8),
+                              TextButton.icon(
+                                onPressed: _isBusy ? null : _loginGuest,
+                                icon: _isGuestLoading
+                                    ? const _SmallLoader()
+                                    : const Icon(Icons.explore_rounded),
+                                label: const Text('Coba sebagai Tamu'),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Text(
-                              'Masuk ke akun',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .headlineSmall
-                                  ?.copyWith(fontWeight: FontWeight.w900),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              'Simpan riwayat klasifikasi dan jelajahi data Hoya dengan lebih nyaman.',
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                            const SizedBox(height: 18),
-                            const Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                _FeaturePill(
-                                  icon: Icons.photo_camera_rounded,
-                                  label: 'Identifikasi cepat',
-                                ),
-                                _FeaturePill(
-                                  icon: Icons.history_rounded,
-                                  label: 'Riwayat tersimpan',
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 22),
-                            TextField(
-                              controller: _emailController,
-                              keyboardType: TextInputType.emailAddress,
-                              decoration: InputDecoration(
-                                labelText: 'Email',
-                                hintText: 'nama@email.com',
-                                prefixIcon: const Icon(Icons.email_rounded),
-                                filled: true,
-                                fillColor: colorScheme.surfaceContainerHighest
-                                    .withValues(alpha: 0.45),
-                              ),
-                            ),
-                            const SizedBox(height: 14),
-                            TextField(
-                              controller: _passwordController,
-                              obscureText: true,
-                              decoration: InputDecoration(
-                                labelText: 'Kata Sandi',
-                                hintText: 'Masukkan kata sandi',
-                                prefixIcon: const Icon(Icons.lock_rounded),
-                                filled: true,
-                                fillColor: colorScheme.surfaceContainerHighest
-                                    .withValues(alpha: 0.45),
-                              ),
-                            ),
-                            const SizedBox(height: 22),
-                            FilledButton.icon(
-                              style: FilledButton.styleFrom(
-                                minimumSize: const Size.fromHeight(52),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(18),
-                                ),
-                              ),
-                              onPressed: _isBusy ? null : _loginEmail,
-                              icon: _isLoading
-                                  ? const _SmallLoader()
-                                  : const Icon(Icons.login_rounded),
-                              label: const Text('Masuk'),
-                            ),
-                            const SizedBox(height: 12),
-                            OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(
-                                minimumSize: const Size.fromHeight(50),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(18),
-                                ),
-                              ),
-                              onPressed: _isBusy ? null : _loginGoogle,
-                              icon: _isGoogleLoading
-                                  ? const _SmallLoader()
-                                  : const Icon(Icons.g_mobiledata_rounded,
-                                      size: 28),
-                              label: const Text('Masuk dengan Google'),
-                            ),
-                            const SizedBox(height: 8),
-                            TextButton.icon(
-                              onPressed: _isBusy ? null : _loginGuest,
-                              icon: _isGuestLoading
-                                  ? const _SmallLoader()
-                                  : const Icon(Icons.explore_rounded),
-                              label: const Text('Coba sebagai Tamu'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
                     ),
                     const SizedBox(height: 18),
                     FadeSlideIn(

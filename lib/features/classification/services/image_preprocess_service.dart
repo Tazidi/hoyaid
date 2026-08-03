@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:hoyaid/features/classification/models/classification_models.dart';
+import 'package:hoyaid/features/classification/services/pillow_bilinear_resizer.dart';
 import 'package:image/image.dart' as img;
 
 class ImagePreprocessService {
@@ -105,17 +106,18 @@ class ImagePreprocessService {
     final y = ((source.height - side) / 2).round();
     return img.copyCrop(source, x: x, y: y, width: side, height: side);
   }
+
   img.Image _resizeWithPad(img.Image source, int targetSize) {
     final scale = targetSize /
         (source.width > source.height ? source.width : source.height);
-    final resizedWidth = (source.width * scale).round().clamp(1, targetSize).toInt();
+    final resizedWidth =
+        (source.width * scale).round().clamp(1, targetSize).toInt();
     final resizedHeight =
         (source.height * scale).round().clamp(1, targetSize).toInt();
-    final resized = img.copyResize(
+    final resized = copyResizePillowBilinear(
       source,
       width: resizedWidth,
       height: resizedHeight,
-      interpolation: img.Interpolation.linear,
     );
     final canvas =
         img.Image(width: targetSize, height: targetSize, numChannels: 3);
@@ -133,7 +135,6 @@ class ImagePreprocessService {
     );
     return canvas;
   }
-
 
   Object _toModelInput(img.Image image, {required bool floatInput}) {
     return [

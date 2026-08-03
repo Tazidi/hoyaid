@@ -6,6 +6,8 @@ import 'package:hoyaid/features/auth/screens/register_screen.dart';
 import 'package:hoyaid/features/auth/screens/profile_screen.dart';
 import 'package:hoyaid/features/benchmark/screens/on_device_benchmark_screen.dart';
 import 'package:hoyaid/features/benchmark/screens/d4_accuracy_evaluation_screen.dart';
+import 'package:hoyaid/features/benchmark/screens/geo_tagging_evaluation_screen.dart';
+import 'package:hoyaid/features/benchmark/screens/geo_tagging_test_guide_screen.dart';
 import 'package:hoyaid/features/admin/screens/admin_dashboard_screen.dart';
 import 'package:hoyaid/features/admin/screens/admin_export_screen.dart';
 import 'package:hoyaid/features/admin/screens/admin_model_upload_screen.dart';
@@ -91,6 +93,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/benchmark/accuracy-d4',
         name: 'd4-accuracy-evaluation',
         builder: (context, state) => const D4AccuracyEvaluationScreen(),
+      ),
+      GoRoute(
+        path: '/benchmark/geo-tagging',
+        name: 'geo-tagging-evaluation',
+        builder: (context, state) => const GeoTaggingEvaluationScreen(),
+      ),
+      GoRoute(
+        path: '/benchmark/geo-tagging/guide',
+        name: 'geo-tagging-test-guide',
+        builder: (context, state) => const GeoTaggingTestGuideScreen(),
       ),
       GoRoute(
         path: '/classification',

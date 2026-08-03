@@ -58,6 +58,13 @@ class MainMenuScreen extends ConsumerWidget {
         color: const Color(0xFF00897B),
         onTap: () => context.push('/benchmark/accuracy-d4'),
       ),
+      _MenuItem(
+        icon: Icons.location_searching_rounded,
+        label: 'Uji Geo-tagging',
+        subtitle: 'GPS, koordinat, dan sinkronisasi',
+        color: const Color(0xFF00796B),
+        onTap: () => context.push('/benchmark/geo-tagging'),
+      ),
       if (isAdmin)
         _MenuItem(
           icon: Icons.dashboard_customize_rounded,
@@ -192,6 +199,8 @@ class _OfflinePendingCardState extends ConsumerState<_OfflinePendingCard> {
                     Expanded(
                       child: Text(
                         '${items.length} data menunggu upload',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style:
                             Theme.of(context).textTheme.titleMedium?.copyWith(
                                   color: colorScheme.onTertiaryContainer,
@@ -199,17 +208,21 @@ class _OfflinePendingCardState extends ConsumerState<_OfflinePendingCard> {
                                 ),
                       ),
                     ),
-                    FilledButton.tonalIcon(
-                      onPressed: _isSyncing ? null : _syncNow,
-                      icon: _isSyncing
-                          ? const SizedBox.square(
-                              dimension: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.sync_rounded),
-                      label: Text(_isSyncing ? 'Sync...' : 'Sync'),
-                    ),
                   ],
+                ),
+                const SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: FilledButton.tonalIcon(
+                    onPressed: _isSyncing ? null : _syncNow,
+                    icon: _isSyncing
+                        ? const SizedBox.square(
+                            dimension: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.sync_rounded),
+                    label: Text(_isSyncing ? 'Sync...' : 'Sync'),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(

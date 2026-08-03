@@ -1,7 +1,7 @@
 name: hoyaid
 description: "Aplikasi klasifikasi dan pemetaan sebaran spesies Hoya"
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.1+6
 
 environment:
   sdk: ^3.5.0

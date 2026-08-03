@@ -45,7 +45,10 @@ void main() async {
       existingWorkPolicy: ExistingPeriodicWorkPolicy.keep,
     );
 
-    // 2. Init App Check (debug provider untuk development)
+    // 2. Init App Check
+    // Server-side enforceAppCheck is disabled (App Check tidak bisa
+    // divalidasi di release APK yang di-install manual / tidak via Play Store).
+    // Functions tetap aman lewat Firebase Auth + assertAdmin().
     await FirebaseAppCheck.instance.activate(
       androidProvider:
           kDebugMode ? AndroidProvider.debug : AndroidProvider.playIntegrity,

@@ -7,6 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hoyaid/core/utils/error_messages.dart';
 import 'package:hoyaid/features/classification/models/classification_models.dart';
 import 'package:hoyaid/features/classification/services/classification_service.dart';
+import 'package:hoyaid/features/classification/services/offline_sync_metrics_store.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -15,6 +16,7 @@ class OfflineClassificationQueueService {
 
   final ClassificationService _classificationService;
   final FirebaseAuth _firebaseAuth;
+  final OfflineSyncMetricsStore _metricsStore = OfflineSyncMetricsStore();
   bool _isSyncing = false;
 
   OfflineClassificationQueueService({
@@ -50,6 +52,9 @@ class OfflineClassificationQueueService {
     );
     final items = await pendingItems();
     await _saveItems([...items, item]);
+    if (!await _isOnline()) {
+      await _metricsStore.recordQueued(item.id);
+    }
     return item;
   }
 
@@ -107,6 +112,7 @@ class OfflineClassificationQueueService {
           break;
         }
         try {
+          final syncStopwatch = Stopwatch()..start();
           await _classificationService.saveClassification(
             prediction: item.prediction,
             displayJpegBytes: await imageFile.readAsBytes(),
@@ -114,6 +120,8 @@ class OfflineClassificationQueueService {
             modelImageSize: item.modelImageSize,
             location: item.location,
           );
+          syncStopwatch.stop();
+          await _metricsStore.recordSuccess(item.id, syncStopwatch.elapsed);
           try {
             await imageFile.delete();
           } catch (_) {}

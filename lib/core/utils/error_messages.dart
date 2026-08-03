@@ -51,7 +51,17 @@ String _firebaseErrorMessage(
     case 'permission-denied':
       return 'Akses ditolak. Pastikan akun dan hak akses sudah sesuai.';
     case 'unauthenticated':
+      // Could be a true auth expiry OR an App Check failure (Firebase Functions V1
+      // with enforceAppCheck:true nullifies context.auth when App Check is invalid,
+      // which can surface as 'unauthenticated' before the auth check runs).
+      if (error.message != null &&
+          error.message!.trim().isNotEmpty &&
+          !error.message!.toLowerCase().contains('login diperlukan')) {
+        return error.message!.trim();
+      }
       return 'Sesi login berakhir. Silakan masuk lagi.';
+    case 'app-check-token-required':
+      return 'App Check tidak valid. Jalankan aplikasi resmi atau aktifkan debug token pengembangan.';
     case 'admin-restricted-operation':
       return 'Login sebagai tamu belum aktif. Admin perlu mengaktifkan Anonymous sign-in di Firebase Authentication.';
     case 'failed-precondition':
@@ -64,8 +74,6 @@ String _firebaseErrorMessage(
       return error.message?.trim().isNotEmpty == true
           ? error.message!.trim()
           : 'Data yang dikirim belum valid.';
-    case 'app-check-token-required':
-      return 'App Check belum valid. Jalankan aplikasi resmi atau aktifkan debug token pengembangan.';
     default:
       return _cleanRawMessage(error.message ?? error.toString(), fallback);
   }

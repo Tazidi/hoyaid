@@ -6,7 +6,12 @@ const db = admin.firestore();
 
 const serverTimestamp = admin.firestore.FieldValue.serverTimestamp;
 const increment = admin.firestore.FieldValue.increment;
-const appCheckedCallableOptions = { enforceAppCheck: true };
+// App Check enforcement disabled: release APKs installed directly (sideload)
+// cannot pass Play Integrity because Google requires Play Store distribution.
+// Security is still enforced via Firebase Auth (assertSignedNonGuest) and
+// Firestore role checks (assertAdmin). App Check adds an extra layer that is
+// only practical after the app is published on the Play Store.
+const appCheckedCallableOptions = { enforceAppCheck: false };
 const pendingClassificationTtlHours = 6;
 const orphanCleanupBatchLimit = 200;
 
@@ -14,7 +19,6 @@ function appCheckedCallable(functionName, handler) {
   return functions
     .runWith(appCheckedCallableOptions)
     .https.onCall(async (data, context) => {
-      assertAppCheck(context, functionName);
       return handler(data, context);
     });
 }
@@ -794,9 +798,15 @@ function assertAppCheck(context, functionName) {
   if (context.app) return;
 
   functions.logger.warn(`${functionName} rejected without App Check context.`);
+  // Throw 'unauthenticated' instead of 'failed-precondition' because when
+  // enforceAppCheck:true is set and the App Check token is invalid/missing,
+  // the Firebase SDK may nullify context.auth as well, which causes the
+  // assertSignedNonGuest check to fire first with a misleading 'unauthenticated'
+  // error. By explicitly validating App Check here with an accurate error code,
+  // the client receives a message that accurately reflects the actual problem.
   throw new functions.https.HttpsError(
-    'failed-precondition',
-    'Permintaan ditolak karena App Check tidak valid.',
+    'unauthenticated',
+    'App Check tidak valid. Pastikan aplikasi dijalankan dari versi resmi atau aktifkan debug token pengembangan.',
   );
 }
 
