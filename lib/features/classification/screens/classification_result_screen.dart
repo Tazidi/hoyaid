@@ -292,7 +292,7 @@ class _ClassificationResultScreenState
         title: const Text('Prediksi Meragukan'),
         content: const Text(
           'Model memberi sinyal confidence rendah atau kemungkinan non-Hoya. '
-          'Data tetap akan berstatus unverified jika disimpan.',
+          'Data akan berstatus Perlu Ditinjau jika disimpan.',
         ),
         actions: [
           TextButton(
@@ -519,15 +519,13 @@ class _HeroImage extends StatelessWidget {
 
 /// Warna berdasarkan level confidence.
 Color _confidenceColor(double confidence) {
-  if (confidence >= 0.8) return const Color(0xFF2E9E5B);
-  if (confidence >= 0.6) return const Color(0xFFE08B2D);
-  return const Color(0xFFD64545);
+  if (hasHighModelConfidence(confidence)) return const Color(0xFF2563EB);
+  return const Color(0xFFE08B2D);
 }
 
 String _confidenceLabel(double confidence) {
-  if (confidence >= 0.8) return 'Keyakinan tinggi';
-  if (confidence >= 0.6) return 'Keyakinan sedang';
-  return 'Keyakinan rendah';
+  if (hasHighModelConfidence(confidence)) return 'Keyakinan Tinggi';
+  return 'Perlu Ditinjau';
 }
 
 class _PredictionHeader extends StatelessWidget {
@@ -714,8 +712,8 @@ class _WarningPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = prediction.ood.isLikelyOod
-        ? 'Foto ini terindikasi meragukan atau mungkin bukan Hoya. Verifikasi manual diperlukan.'
-        : 'Confidence rendah. Hasil perlu diperiksa kembali.';
+        ? 'Foto ini terindikasi meragukan atau mungkin bukan Hoya. Tinjauan ahli diperlukan.'
+        : 'Keyakinan model belum mencukupi. Hasil perlu ditinjau ahli.';
 
     return Material(
       color: Colors.orange.withValues(alpha: 0.16),

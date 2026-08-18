@@ -8,45 +8,37 @@ service firebase.storage {
 
     function isAdmin() {
       return signedIn()
-        && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
-        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
-    }
-
-    function speciesExists(speciesId) {
-      return firestore.exists(/databases/(default)/documents/species/$(speciesId));
-    }
-
-    function speciesData(speciesId) {
-      return firestore.get(/databases/(default)/documents/species/$(speciesId)).data;
+        && (
+          request.auth.token.role == 'admin'
+          || (
+            firestore.get(/databases/(default)/documents/users/$(request.auth.uid)) != null
+            && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin'
+          )
+        );
     }
 
     function canReadSpeciesImage(speciesId) {
-      return speciesExists(speciesId)
-        && (speciesData(speciesId).isActive == true || isAdmin());
-    }
-
-    function classificationExists(classificationId) {
-      return firestore.exists(/databases/(default)/documents/classifications/$(classificationId));
-    }
-
-    function classificationData(classificationId) {
-      return firestore.get(/databases/(default)/documents/classifications/$(classificationId)).data;
+      return (
+        firestore.get(/databases/(default)/documents/species/$(speciesId)) != null
+        && firestore.get(/databases/(default)/documents/species/$(speciesId)).data.isActive == true
+      ) || isAdmin();
     }
 
     function ownsClassificationImage(userId, classificationId) {
       return signedIn()
         && request.auth.uid == userId
-        && classificationExists(classificationId)
-        && classificationData(classificationId).userId == request.auth.uid;
+        && firestore.get(/databases/(default)/documents/classifications/$(classificationId)) != null
+        && firestore.get(/databases/(default)/documents/classifications/$(classificationId)).data.userId == request.auth.uid;
     }
 
     function canReadClassificationImage(userId, classificationId) {
-      return classificationExists(classificationId)
+      return (
+        firestore.get(/databases/(default)/documents/classifications/$(classificationId)) != null
         && (
-          classificationData(classificationId).status == 'active'
+          firestore.get(/databases/(default)/documents/classifications/$(classificationId)).data.status == 'active'
           || ownsClassificationImage(userId, classificationId)
-          || isAdmin()
-        );
+        )
+      ) || isAdmin();
     }
 
     match /species_images/{speciesId}/{fileName} {
@@ -65,7 +57,7 @@ service firebase.storage {
         && request.resource.size <= 5 * 1024 * 1024
         && request.resource.contentType.matches('image/.*')
         && ownsClassificationImage(userId, classificationId)
-        && classificationData(classificationId).status == 'pending';
+        && firestore.get(/databases/(default)/documents/classifications/$(classificationId)).data.status == 'pending';
       allow delete: if isAdmin();
     }
 
@@ -77,7 +69,6 @@ service firebase.storage {
     match /models/{modelVersion}/{fileName} {
       allow read: if signedIn();
       allow create, update: if isAdmin()
-        && fileName.matches('.*\\.tflite')
         && request.resource.size <= 100 * 1024 * 1024;
       allow delete: if isAdmin();
     }

@@ -358,7 +358,7 @@ class _DistributionMapScreenState extends ConsumerState<DistributionMapScreen> {
               const SizedBox(height: 8),
               Text('Dibuat: $createdAt'),
               Text('Confidence: ${record.confidencePercent}'),
-              Text('Verifikasi: ${record.verificationLabel}'),
+              Text('Status: ${record.displayStatusLabel}'),
               Text('Koordinat: ${record.locationLabel}'),
               Text(point.isPrecise ? 'Lokasi presisi' : 'Lokasi publik'),
               const SizedBox(height: 16),
@@ -423,7 +423,7 @@ class _DistributionMapScreenState extends ConsumerState<DistributionMapScreen> {
                       ),
                       title: Text(species?.displayName ?? record.speciesId),
                       subtitle: Text(
-                        '${record.verificationLabel} • $date • '
+                        '${record.displayStatusLabel} • $date • '
                         '${point.isPrecise ? 'presisi' : 'publik'}',
                       ),
                       onTap: () {
@@ -1013,6 +1013,9 @@ class _ClusterMarker extends StatelessWidget {
 
 Color _markerColor(BuildContext context, DistributionMapPoint point) {
   if (point.record.isVerified) return Colors.green;
+  if (point.record.isHighConfidence && point.record.isUnverified) {
+    return Colors.blue;
+  }
   if (point.record.isUnverified) return Colors.orange;
   return Theme.of(context).colorScheme.error;
 }
@@ -1027,7 +1030,9 @@ class _MarkerLegend extends StatelessWidget {
       runSpacing: 6,
       children: [
         _LegendItem(color: Colors.green, label: 'Terverifikasi Ahli'),
-        _LegendItem(color: Colors.orange, label: 'Pending/Unverified'),
+        _LegendItem(color: Colors.blue, label: 'Keyakinan Tinggi'),
+        _LegendItem(color: Colors.orange, label: 'Perlu Ditinjau'),
+        _LegendItem(color: Colors.red, label: 'Ditolak Ahli'),
       ],
     );
   }

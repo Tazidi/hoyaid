@@ -69,7 +69,7 @@ class _AdminExportScreenState extends ConsumerState<AdminExportScreen> {
                       onChanged: _isExporting
                           ? null
                           : (value) => setState(() => _verifiedOnly = value),
-                      title: const Text('Hanya data verified'),
+                      title: const Text('Hanya data terverifikasi ahli'),
                       contentPadding: EdgeInsets.zero,
                     ),
                     const SizedBox(height: 12),

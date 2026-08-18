@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:hoyaid/features/classification/models/classification_models.dart';
 
 enum ClassificationSortOrder {
   newest,
@@ -148,13 +149,15 @@ class ClassificationRecord {
   bool get isVerified => verificationStatus == 'verified';
   bool get isRejected => verificationStatus == 'rejected';
   bool get isUnverified => verificationStatus == 'unverified';
+  bool get isHighConfidence => hasHighModelConfidence(confidence);
   bool get hasCorrection => correctedSpeciesId?.isNotEmpty == true;
 
-  String get verificationLabel => switch (verificationStatus) {
-        'verified' => 'Telah Terverifikasi Ahli',
+  String get displayStatusLabel => switch (verificationStatus) {
+        'verified' => 'Terverifikasi Ahli',
         'rejected' => 'Ditolak Ahli',
-        'unverified' => 'Pending / Belum Terverifikasi',
-        _ => 'Pending / Belum Terverifikasi',
+        'unverified' =>
+          isHighConfidence ? 'Keyakinan Tinggi' : 'Perlu Ditinjau',
+        _ => 'Perlu Ditinjau',
       };
 
   double? get displayLatitude => privateLocation?.latitude ?? latitudePublic;

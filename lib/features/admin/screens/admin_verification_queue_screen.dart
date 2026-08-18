@@ -32,7 +32,7 @@ class AdminVerificationQueueScreen extends ConsumerWidget {
                         children: [
                           Icon(Icons.verified_outlined, size: 56),
                           SizedBox(height: 16),
-                          Text('Tidak ada data unverified.'),
+                          Text('Tidak ada data yang perlu ditinjau.'),
                         ],
                       ),
                     ),
@@ -135,8 +135,7 @@ class _VerificationCardState extends ConsumerState<_VerificationCard> {
                         ? Image.network(
                             record.imageUrl!,
                             fit: BoxFit.cover,
-                            loadingBuilder:
-                                (context, child, loadingProgress) {
+                            loadingBuilder: (context, child, loadingProgress) {
                               if (loadingProgress == null) return child;
                               return const Center(
                                 child: SizedBox.square(
@@ -170,6 +169,7 @@ class _VerificationCardState extends ConsumerState<_VerificationCard> {
                       ),
                       Text(date),
                       Text('Confidence ${record.confidencePercent}'),
+                      Text(record.displayStatusLabel),
                       Text(
                         record.hasLocation
                             ? record.locationLabel
@@ -188,7 +188,7 @@ class _VerificationCardState extends ConsumerState<_VerificationCard> {
                 FilledButton.icon(
                   onPressed: _isWorking ? null : () => _setStatus('verified'),
                   icon: const Icon(Icons.verified_outlined),
-                  label: const Text('Verifikasi'),
+                  label: const Text('Verifikasi Ahli'),
                 ),
                 OutlinedButton.icon(
                   onPressed: _isWorking ? null : () => _setStatus('rejected'),

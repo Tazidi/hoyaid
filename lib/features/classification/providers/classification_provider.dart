@@ -18,6 +18,7 @@ final classificationConfigServiceProvider =
   return ClassificationConfigService(
     firestore: ref.watch(activeFirestoreProvider),
     storage: ref.watch(activeStorageProvider),
+    functions: ref.watch(activeFunctionsProvider),
   );
 });
 

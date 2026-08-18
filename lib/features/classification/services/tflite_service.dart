@@ -58,6 +58,25 @@ class TFLiteService {
     return Interpreter.fromAsset(config.modelAssetPath);
   }
 
+  Future<void> loadCustomModelFile(File file) async {
+    final modelKey = 'file:${file.path}';
+    if (_interpreter != null && _loadedModelKey == modelKey) {
+      return;
+    }
+
+    _interpreter?.close();
+    try {
+      _interpreter = await Interpreter.fromFile(file);
+      _loadedModelKey = modelKey;
+    } catch (_) {
+      _interpreter = null;
+      _loadedModelKey = null;
+      throw StateError(
+        'Gagal memuat file model TFLite dari ${file.path}.',
+      );
+    }
+  }
+
   bool get isFloatInput {
     final interpreter = _requiredInterpreter();
     return interpreter.getInputTensor(0).type == TensorType.float32;

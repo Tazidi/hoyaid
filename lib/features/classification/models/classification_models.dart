@@ -1,5 +1,10 @@
 import 'dart:typed_data';
 
+const double modelHighConfidenceThreshold = 0.75;
+
+bool hasHighModelConfidence(double confidence) =>
+    confidence >= modelHighConfidenceThreshold;
+
 class TopPrediction {
   final int labelIndex;
   final String speciesId;

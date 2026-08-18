@@ -838,7 +838,12 @@ async function isAdminUid(uid) {
 }
 
 async function assertAdmin(uid) {
-  if (await isAdminUid(uid)) return;
+  if (await isAdminUid(uid)) {
+    try {
+      await admin.auth().setCustomUserClaims(uid, { role: 'admin' });
+    } catch (_) {}
+    return;
+  }
   throw new functions.https.HttpsError(
     'permission-denied',
     'Akses admin diperlukan.',
@@ -1060,7 +1065,7 @@ function roundCoord(value, precision) {
 }
 
 function confidenceBucket(confidence) {
-  if (confidence >= 0.80) return 'high';
+  if (confidence >= 0.75) return 'high';
   if (confidence >= 0.60) return 'medium';
   return 'low';
 }
@@ -1115,3 +1120,70 @@ function readInteger(source, key, required) {
   }
   return null;
 }
+
+exports.uploadModelConfig = appCheckedCallable(
+  'uploadModelConfig',
+  async (data, context) => {
+    const adminUid = assertSignedNonGuest(context);
+    await assertAdmin(adminUid);
+
+    const version = readString(data, 'version', true).trim();
+    const fileName = readString(data, 'fileName', true).trim();
+    const base64Data = readString(data, 'base64Data', false);
+
+    if (!version) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'Versi model wajib diisi.',
+      );
+    }
+    if (!fileName.toLowerCase().endsWith('.tflite')) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'File model harus berformat .tflite.',
+      );
+    }
+
+    const storagePath = `models/${version}/${fileName}`;
+    const bucket = storageBucket();
+    const fileRef = bucket.file(storagePath);
+
+    if (base64Data) {
+      const buffer = Buffer.from(base64Data, 'base64');
+      await fileRef.save(buffer, {
+        metadata: {
+          contentType: 'application/octet-stream',
+          metadata: {
+            modelVersion: version,
+            fileName: fileName,
+          },
+        },
+      });
+    }
+
+    let downloadUrl = '';
+    try {
+      const [signedUrl] = await fileRef.getSignedUrl({
+        action: 'read',
+        expires: '03-01-2500',
+      });
+      downloadUrl = signedUrl;
+    } catch (_) {
+      downloadUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(storagePath)}?alt=media`;
+    }
+
+    await db.collection('app_config').doc('general').set(
+      {
+        activeModelVersion: version,
+        useRemoteModel: true,
+        remoteModelStoragePath: storagePath,
+        remoteModelDownloadUrl: downloadUrl,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    );
+
+    return { success: true, storagePath, downloadUrl };
+  },
+);
+

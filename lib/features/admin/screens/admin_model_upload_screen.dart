@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hoyaid/core/utils/error_messages.dart';
@@ -26,20 +29,40 @@ class _AdminModelUploadScreenState
   }
 
   Future<void> _pickModelFile() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const ['tflite'],
-      withData: true,
-    );
-    final file = result?.files.single;
-    if (file == null) return;
-    setState(() => _selectedFile = file);
+    try {
+      // Gunakan FileType.any karena .tflite bukan MIME type standar di Android.
+      // Jika menggunakan FileType.custom dengan 'tflite', Android akan mendisable file atau gagal membuka picker.
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.any,
+        withData: true,
+      );
+
+      final file = result?.files.single;
+      if (file == null) return;
+
+      // Validasi ekstensi .tflite di level aplikasi
+      if (!file.name.toLowerCase().endsWith('.tflite')) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Format file tidak valid. Harap pilih file dengan ekstensi .tflite.'),
+          ),
+        );
+        return;
+      }
+
+      setState(() => _selectedFile = file);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal memilih file: $error')),
+      );
+    }
   }
 
   Future<void> _upload() async {
     final file = _selectedFile;
-    final bytes = file?.bytes;
-    if (file == null || bytes == null) {
+    if (file == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Pilih file model .tflite terlebih dulu.')),
       );
@@ -48,6 +71,19 @@ class _AdminModelUploadScreenState
 
     setState(() => _isUploading = true);
     try {
+      // Dapatkan bytes file (baik dari memory jika tersedia, atau dari path file di storage)
+      List<int>? bytes = file.bytes;
+      if (bytes == null && file.path != null && !kIsWeb) {
+        final ioFile = File(file.path!);
+        if (await ioFile.exists()) {
+          bytes = await ioFile.readAsBytes();
+        }
+      }
+
+      if (bytes == null || bytes.isEmpty) {
+        throw StateError('Tidak dapat membaca isi file model.');
+      }
+
       await ref.read(classificationConfigServiceProvider).uploadModelVersion(
             version: _versionController.text,
             fileName: file.name,

@@ -12,8 +12,13 @@ service cloud.firestore {
 
     function isAdmin() {
       return signedIn()
-        && exists(userDoc())
-        && get(userDoc()).data.role == 'admin';
+        && (
+          request.auth.token.role == 'admin'
+          || (
+            exists(userDoc())
+            && get(userDoc()).data.role == 'admin'
+          )
+        );
     }
 
     function isActiveSpecies() {

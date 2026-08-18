@@ -232,7 +232,7 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
             rows: [
               _InfoRow('Dibuat', createdAt),
               _InfoRow('Status data', record.status),
-              _InfoRow('Verifikasi', record.verificationLabel),
+              _InfoRow('Status identifikasi', record.displayStatusLabel),
               _InfoRow('Confidence', record.confidencePercent),
               _InfoRow('Bucket', record.confidenceBucket),
               if (record.oodScore != null)
@@ -413,6 +413,10 @@ class _VerificationBadge extends StatelessWidget {
       backgroundColor = colorScheme.errorContainer;
       foregroundColor = colorScheme.onErrorContainer;
       icon = Icons.block_outlined;
+    } else if (record.isHighConfidence) {
+      backgroundColor = Colors.blue.shade50;
+      foregroundColor = Colors.blue.shade800;
+      icon = Icons.auto_awesome_outlined;
     } else {
       backgroundColor = Colors.orange.shade50;
       foregroundColor = Colors.orange.shade900;
@@ -435,7 +439,7 @@ class _VerificationBadge extends StatelessWidget {
               Icon(icon, color: foregroundColor, size: 18),
               const SizedBox(width: 6),
               Text(
-                record.verificationLabel,
+                record.displayStatusLabel,
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
                       color: foregroundColor,
                       fontWeight: FontWeight.w700,
@@ -714,7 +718,7 @@ class _ActionPanel extends StatelessWidget {
                         ? null
                         : onVerify,
                     icon: const Icon(Icons.verified_outlined),
-                    label: const Text('Verifikasi'),
+                    label: const Text('Verifikasi Ahli'),
                   ),
                   OutlinedButton.icon(
                     onPressed: isWorking || verificationStatus == 'rejected'
@@ -728,7 +732,7 @@ class _ActionPanel extends StatelessWidget {
                         ? null
                         : onUnverify,
                     icon: const Icon(Icons.pending_actions_outlined),
-                    label: const Text('Unverified'),
+                    label: const Text('Batalkan Verifikasi'),
                   ),
                 ],
               ),

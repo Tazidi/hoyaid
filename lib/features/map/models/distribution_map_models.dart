@@ -53,7 +53,7 @@ extension DistributionBasemapX on DistributionBasemap {
 extension DistributionVerificationFilterX on DistributionVerificationFilter {
   String get label => switch (this) {
         DistributionVerificationFilter.all => 'Semua',
-        DistributionVerificationFilter.verified => 'Terverifikasi',
+        DistributionVerificationFilter.verified => 'Terverifikasi Ahli',
         DistributionVerificationFilter.publicUnverified => 'Temuan Publik',
       };
 }

@@ -596,14 +596,20 @@ class _HistoryFilterPanelState extends State<_HistoryFilterPanel> {
     return DropdownButtonFormField<String>(
       initialValue: filter.verificationStatus ?? '',
       decoration: const InputDecoration(
-        labelText: 'Verifikasi',
+        labelText: 'Tinjauan Ahli',
         prefixIcon: Icon(Icons.fact_check_outlined),
       ),
       items: const [
         DropdownMenuItem(value: '', child: Text('Semua')),
-        DropdownMenuItem(value: 'unverified', child: Text('Unverified')),
-        DropdownMenuItem(value: 'verified', child: Text('Verified')),
-        DropdownMenuItem(value: 'rejected', child: Text('Rejected')),
+        DropdownMenuItem(
+          value: 'unverified',
+          child: Text('Belum ditinjau ahli'),
+        ),
+        DropdownMenuItem(
+          value: 'verified',
+          child: Text('Terverifikasi ahli'),
+        ),
+        DropdownMenuItem(value: 'rejected', child: Text('Ditolak ahli')),
       ],
       onChanged: (value) {
         widget.onChanged(
@@ -752,7 +758,7 @@ class _ClassificationCard extends StatelessWidget {
                             icon: Icons.speed_outlined,
                             text: record.confidencePercent,
                           ),
-                          _VerificationChip(status: record.verificationStatus),
+                          _VerificationChip(record: record),
                           if (record.hasCorrection)
                             const _StatusChip(
                               icon: Icons.edit_note_outlined,
@@ -845,26 +851,28 @@ class _NetworkThumbnail extends StatelessWidget {
 }
 
 class _VerificationChip extends StatelessWidget {
-  final String status;
+  final ClassificationRecord record;
 
-  const _VerificationChip({required this.status});
+  const _VerificationChip({required this.record});
 
   @override
   Widget build(BuildContext context) {
-    final color = switch (status) {
+    final color = switch (record.verificationStatus) {
       'verified' => Colors.green,
       'rejected' => Colors.red,
-      _ => Colors.orange,
+      _ => record.isHighConfidence ? Colors.blue : Colors.orange,
     };
-    final icon = switch (status) {
+    final icon = switch (record.verificationStatus) {
       'verified' => Icons.verified_outlined,
       'rejected' => Icons.block_outlined,
-      _ => Icons.pending_actions_outlined,
+      _ => record.isHighConfidence
+          ? Icons.auto_awesome_outlined
+          : Icons.pending_actions_outlined,
     };
 
     return _StatusChip(
       icon: icon,
-      text: status,
+      text: record.displayStatusLabel,
       color: color,
     );
   }

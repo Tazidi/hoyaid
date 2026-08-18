@@ -27,6 +27,9 @@ class D4AccuracyEvaluationService {
 
   Future<D4AccuracyEvaluationResult> run({
     required String mobileDatasetRoot,
+    ClassificationConfig? config,
+    File? customModelFile,
+    String? modelVersionOverride,
     D4EvaluationProgress? onProgress,
   }) async {
     final root = Directory(mobileDatasetRoot);
@@ -43,8 +46,8 @@ class D4AccuracyEvaluationService {
     }
 
     final manifest = await _readManifest(manifestFile);
-    final config = ClassificationConfig.fallback();
-    final labels = await _readAssetLabels(config.labelsAssetPath);
+    final effectiveConfig = config ?? ClassificationConfig.fallback();
+    final labels = await _readAssetLabels(effectiveConfig.labelsAssetPath);
     if (labels.length != 30) {
       throw StateError(
         'labels.txt harus berisi 30 label, ditemukan ${labels.length}.',
@@ -56,9 +59,38 @@ class D4AccuracyEvaluationService {
       );
     }
 
-    final modelBytes = await rootBundle.load(config.modelAssetPath);
+    int modelSizeBytes = 0;
+    String effectiveModelVersion =
+        modelVersionOverride ?? effectiveConfig.activeModelVersion;
+
     _tfliteService.dispose();
-    await _tfliteService.loadModel(config);
+
+    if (customModelFile != null) {
+      if (!await customModelFile.exists()) {
+        throw StateError(
+          'File model kustom tidak ditemukan: ${customModelFile.path}',
+        );
+      }
+      modelSizeBytes = await customModelFile.length();
+      effectiveModelVersion = modelVersionOverride ??
+          customModelFile.uri.pathSegments.last.replaceAll('.tflite', '');
+      await _tfliteService.loadCustomModelFile(customModelFile);
+    } else {
+      await _tfliteService.loadModel(effectiveConfig);
+      if (effectiveConfig.useRemoteModel &&
+          effectiveConfig.remoteModelStoragePath?.isNotEmpty == true) {
+        final cachedFile = File(
+          '${Directory.systemTemp.path}/${effectiveConfig.activeModelVersion}.tflite',
+        );
+        if (await cachedFile.exists()) {
+          modelSizeBytes = await cachedFile.length();
+        }
+      } else {
+        final modelBytes =
+            await rootBundle.load(effectiveConfig.modelAssetPath);
+        modelSizeBytes = modelBytes.lengthInBytes;
+      }
+    }
 
     final startedAt = DateTime.now();
     final predictions = <D4BatchPrediction>[];
@@ -73,7 +105,7 @@ class D4AccuracyEvaluationService {
           final preprocessingWatch = Stopwatch()..start();
           final input = await _preprocessService.processEvaluationModelInput(
             imagePath: imagePath,
-            modelSize: config.inputSize,
+            modelSize: effectiveConfig.inputSize,
             floatInput: _tfliteService.isFloatInput,
           );
           preprocessingWatch.stop();
@@ -82,7 +114,7 @@ class D4AccuracyEvaluationService {
           final prediction = _tfliteService.run(
             modelInput: input,
             labels: labels,
-            config: config,
+            config: effectiveConfig,
           );
           inferenceWatch.stop();
           predictions.add(
@@ -124,7 +156,6 @@ class D4AccuracyEvaluationService {
           total: manifest.length,
           currentFile: sample.relativePath,
         );
-        await Future<void>.delayed(Duration.zero);
       }
     } finally {
       _tfliteService.dispose();
@@ -132,17 +163,16 @@ class D4AccuracyEvaluationService {
 
     final processed = predictions.where((item) => item.isProcessed).toList();
     double mean(Iterable<double> values) {
-      final list = values.toList();
-      if (list.isEmpty) return 0;
-      return list.fold<double>(0, (sum, value) => sum + value) / list.length;
+      if (values.isEmpty) return 0;
+      return values.reduce((a, b) => a + b) / values.length;
     }
 
     final finishedAt = DateTime.now();
     return D4AccuracyEvaluationResult(
       startedAt: startedAt,
       finishedAt: finishedAt,
-      modelVersion: config.activeModelVersion,
-      modelSizeBytes: modelBytes.lengthInBytes,
+      modelVersion: effectiveModelVersion,
+      modelSizeBytes: modelSizeBytes,
       expectedSamples: manifest.length,
       predictions: predictions,
       metrics: D4AccuracyMetrics.calculate(
